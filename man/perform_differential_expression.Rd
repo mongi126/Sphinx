@@ -5,35 +5,13 @@
 \title{Perform differential expression analysis}
 \usage{
 perform_differential_expression(protein_df)
-
-perform_differential_expression(protein_df)
 }
 \arguments{
 \item{protein_df}{Data frame with protein expression and cluster information}
-
-\item{diff_results}{Differential expression results}
-
-\item{fc_thresh}{Fold change threshold (default: 0.25)}
-
-\item{p_thresh}{P-value threshold (default: 0.05)}
-
-\item{cn_cluster}{Optional vector of clusters to plot (default: NULL = all)}
-
-\item{y_max}{Optional maximum for y-axis (logP) (default: NULL = auto)}
-
-\item{save_plot}{Whether to save the plot (default: FALSE)}
-
-\item{output_dir}{Output directory for saving (default: "plots")}
-
-\item{filename}{Output filename (default: "volcano_plots")}
 }
 \value{
 Data frame with differential expression results
-
-ggplot object
 }
 \description{
 Perform differential expression analysis
-
-Plot volcano plots for differential proteins across all clusters
 }

@@ -1,0 +1,38 @@
+setwd("../")
+# 安装并加载开发包所需包
+# install.packages("usethis", "devtools", "roxygen2")
+library(usethis)
+library(devtools)
+library(rmarkdown)
+remove.packages("rlang")
+install.packages("rlang", type = "source")
+library(roxygen2)
+setwd("../")
+.libPaths()
+remove.packages("Sphinx")
+# 检查
+has_devel()
+file.edit("DESCRIPTION")
+# R包储存路径
+dir.create("D:/Sphinx")
+setwd("D:/Sphinx")
+usethis::create_package("Sphinx")
+# 生成许可文件
+usethis::use_mit_license()
+# 写入注释
+devtools::document()
+# 检查包
+devtools::check()
+# 创建许可证信息
+usethis::use_mit_license()
+# 建包
+devtools::build()
+
+
+
+packageVersion("Sphinx")
+
+
+usethis::use_readme_md()
+file.exists("man/figures/logo.png")
+

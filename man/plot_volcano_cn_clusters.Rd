@@ -28,6 +28,10 @@ plot_volcano_cn_clusters(
 
 \item{y_max}{Optional maximum for y-axis (logP) (default: NULL = auto)}
 
+\item{cap_p}{P-value cap for extreme values (default: 1e-50)}
+
+\item{cap_jitter}{Jitter amount for capped points (default: 0.15, not used in current implementation)}
+
 \item{save_plot}{Whether to save the plot (default: FALSE)}
 
 \item{output_dir}{Output directory for saving (default: "plots")}

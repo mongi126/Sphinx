@@ -1,5 +1,34 @@
 # R/spatial_network.R
 
+#' @importFrom stats setNames complete.cases dist quantile sd
+#' @importFrom utils installed.packages
+#' @importFrom data.table as.data.table is.data.table setnames copy rbindlist
+#'   setattr setkey .I .SD .N
+#' @importFrom RANN nn2
+#' @importFrom deldir deldir triang.list tile.list
+#' @importFrom igraph graph_from_data_frame V E degree strength
+#'   vcount induced_subgraph cluster_louvain
+#' @importFrom ggraph ggraph geom_edge_link geom_node_point geom_node_text
+#' @importFrom ggplot2 ggplot aes geom_polygon geom_point geom_segment geom_tile
+#'   geom_text geom_col geom_line scale_color_manual scale_fill_manual
+#'   scale_size_continuous scale_alpha_continuous scale_color_viridis_c
+#'   scale_fill_gradientn scale_color_identity scale_alpha_manual
+#'   theme_void theme_minimal theme_bw element_text element_rect
+#'   element_line element_blank labs coord_fixed xlim ylim guides
+#'   guide_legend ggsave margin
+#' @importFrom scales hue_pal percent_format rescale
+#' @importFrom reshape2 melt
+#' @importFrom ComplexHeatmap Heatmap rowAnnotation anno_barplot
+#' @importFrom circlize colorRamp2
+#' @importFrom grid gpar unit
+#' @importFrom grDevices pdf dev.off colorRampPalette
+#' @importFrom RColorBrewer brewer.pal
+#' @importFrom dplyr group_by summarise mutate ungroup filter arrange desc
+#' @importFrom tidyr pivot_wider
+#' @importFrom tibble deframe
+#' @importFrom purrr map_df
+NULL
+
 #' Prepare spatial data for network analysis
 #'
 #' @param df Data frame containing spatial data

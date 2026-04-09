@@ -1,5 +1,15 @@
 # R/preprocessing.R
 
+#' @importFrom utils head installed.packages read.csv
+#' @importFrom stats median mad quantile
+#' @importFrom Seurat CreateSeuratObject DefaultAssay NormalizeData
+#'   SetAssayData GetAssayData VariableFeatures ScaleData RunPCA
+#'   FindNeighbors FindClusters RunUMAP DimPlot ElbowPlot Embeddings
+#'   CreateDimReducObject
+#' @importFrom ggplot2 ggplot aes geom_point theme_classic scale_color_manual
+#'   coord_fixed labs element_text ggsave ggtitle
+NULL
+
 #' Custom color palette for visualizations
 #'
 #' A predefined vector of 36 distinct colors for consistent plotting
@@ -68,7 +78,7 @@ load_spatial_data <- function(filename = NULL,
   if (type == "akoya") {
     if (is.null(filename) || !file.exists(filename))
       stop("Akoya csv file not found.")
-    obj <- LoadAkoya(filename = filename,
+    obj <- Seurat::LoadAkoya(filename = filename,
                                 type = akoya_type,
                                 fov = fov)
     message("Loaded Akoya data into Seurat object. Cell count: ", ncol(obj))

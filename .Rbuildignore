@@ -1,6 +1,13 @@
+^\.github$
+^\.git$
 ^Sphinx\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
+^vignettes
+^.*\.Rproj$
+^\.DS_Store$
+^build$
+^inst$

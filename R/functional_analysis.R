@@ -1,5 +1,11 @@
 # R/functional_analysis.R
 
+#' @importFrom stats na.omit reorder setNames
+#' @importFrom utils installed.packages
+#' @importFrom ggplot2 theme_bw element_line margin
+#' @importFrom scales hue_pal
+NULL
+
 #' Prepare protein expression data for functional analysis
 #'
 #' @param cluster_df Data frame with neighborhood cluster assignments and spatial coordinates
@@ -91,65 +97,6 @@ perform_differential_expression <- function(protein_df) {
   return(final_result)
 }
 
-#' Plot volcano plots for differential proteins across all clusters
-#'
-#' @param diff_results Differential expression results
-#' @param fc_thresh Fold change threshold (default: 0.25)
-#' @param p_thresh P-value threshold (default: 0.05)
-#' @param cn_cluster Optional vector of clusters to plot (default: NULL = all)
-#' @param y_max Optional maximum for y-axis (logP) (default: NULL = auto)
-#' @param save_plot Whether to save the plot (default: FALSE)
-#' @param output_dir Output directory for saving (default: "plots")
-#' @param filename Output filename (default: "volcano_plots")
-#' @return ggplot object
-#' @export
-perform_differential_expression <- function(protein_df) {
-  meta_cols <- c("Cell_ID", "X", "Y", "Neighborhood_Cluster", "Spatial_Zone")
-  protein_cols <- setdiff(colnames(protein_df), meta_cols)
-
-  clusters <- unique(protein_df$Neighborhood_Cluster)
-  results <- list()
-
-  for (cluster in clusters) {
-    protein_df$In_Cluster <- ifelse(
-      protein_df$Neighborhood_Cluster == cluster,
-      "Target",
-      "Control"
-    )
-
-    cluster_results <- lapply(protein_cols, function(prot) {
-      target <- protein_df[protein_df$In_Cluster == "Target", prot]
-      control <- protein_df[protein_df$In_Cluster == "Control", prot]
-
-      if (length(target) < 2 || length(control) < 2) return(NULL)
-
-      test_res <- t.test(target, control)
-
-      mt <- mean(target, na.rm = TRUE)
-      mc <- mean(control, na.rm = TRUE)
-
-      data.frame(
-        Protein = prot,
-        Cluster = cluster,
-        Mean_Target = mt,
-        Mean_Control = mc,
-        Log2FC = log2(mt / mc),
-        p.value = test_res$p.value
-      )
-    })
-
-    cluster_df <- do.call(rbind, cluster_results)
-    if (!is.null(cluster_df)) {
-      cluster_df$adj.p.value <- p.adjust(cluster_df$p.value, method = "BH")
-      results[[as.character(cluster)]] <- cluster_df
-    }
-  }
-
-  final_result <- do.call(rbind, results)
-  rownames(final_result) <- NULL
-  final_result
-}
-
 #' Plot volcano plots for differential proteins across clusters
 #'
 #' @param diff_results Differential expression results (from perform_differential_expression)
@@ -157,6 +104,8 @@ perform_differential_expression <- function(protein_df) {
 #' @param p_thresh Adjusted p-value threshold (default: 0.05)
 #' @param cn_cluster Optional vector of clusters to plot (default: NULL = all)
 #' @param y_max Optional maximum for y-axis (logP) (default: NULL = auto)
+#' @param cap_p P-value cap for extreme values (default: 1e-50)
+#' @param cap_jitter Jitter amount for capped points (default: 0.15, not used in current implementation)
 #' @param save_plot Whether to save the plot (default: FALSE)
 #' @param output_dir Output directory for saving (default: "plots")
 #' @param filename Output filename (default: "volcano_plots")
@@ -434,7 +383,7 @@ plot_enrichment_results <- function(
 ) {
 
   required_pkgs <- c("dplyr", "ggplot2", "scales", "stringr", "viridis")
-  miss <- setdiff(required_pkgs, rownames(installed.packages()))
+  miss <- setdiff(required_pkgs, rownames(utils::installed.packages()))
   if (length(miss)) stop("Please install required packages: ", paste(miss, collapse = ", "))
 
   required_cols <- c("Cluster", "FDR", "Term", "GenesN")
@@ -443,15 +392,15 @@ plot_enrichment_results <- function(
   }
 
   enrich_top <- cluster_enrich %>%
-    filter(FDR < fdr_cutoff) %>%
-    group_by(Cluster) %>%
-    arrange(FDR) %>%
-    slice_head(n = top_n) %>%
-    ungroup() %>%
-    mutate(
+    dplyr::filter(FDR < fdr_cutoff) %>%
+    dplyr::group_by(Cluster) %>%
+    dplyr::arrange(FDR) %>%
+    dplyr::slice_head(n = top_n) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
       log10FDR = -log10(FDR),
-      Term_short = str_replace(Term, " \\(.*", ""),
-      Term_short = str_trunc(Term_short, term_trunc_length)
+      Term_short = stringr::str_replace(Term, " \\(.*", ""),
+      Term_short = stringr::str_trunc(Term_short, term_trunc_length)
     )
 
   if (nrow(enrich_top) == 0) {
@@ -459,46 +408,46 @@ plot_enrichment_results <- function(
     return(list())
   }
 
-  sci_theme <- theme_bw(base_size = base_font_size) +
-    theme(
-      text            = element_text(family = "Arial", colour = "black"),
-      plot.title      = element_text(face = "bold", size = base_font_size + 1,
-                                     hjust = 0.5, margin = margin(b = 3)),
-      axis.title      = element_text(face = "bold", size = base_font_size),
-      axis.text.x     = element_text(size = base_font_size, angle = 45, hjust = 1, vjust = 1),
-      axis.text.y     = element_text(size = base_font_size),
-      axis.ticks      = element_line(linewidth = 0.3),
-      panel.grid      = element_blank(),
-      panel.border    = element_rect(fill = NA, linewidth = 0.3),
-      legend.text     = element_text(size = base_font_size - 0.5),
-      legend.title    = element_text(size = base_font_size, face = "bold"),
+  sci_theme <- ggplot2::theme_bw(base_size = base_font_size) +
+    ggplot2::theme(
+      text            = ggplot2::element_text(family = "Arial", colour = "black"),
+      plot.title      = ggplot2::element_text(face = "bold", size = base_font_size + 1,
+                                              hjust = 0.5, margin = ggplot2::margin(b = 3)),
+      axis.title      = ggplot2::element_text(face = "bold", size = base_font_size),
+      axis.text.x     = ggplot2::element_text(size = base_font_size, angle = 45, hjust = 1, vjust = 1),
+      axis.text.y     = ggplot2::element_text(size = base_font_size),
+      axis.ticks      = ggplot2::element_line(linewidth = 0.3),
+      panel.grid      = ggplot2::element_blank(),
+      panel.border    = ggplot2::element_rect(fill = NA, linewidth = 0.3),
+      legend.text     = ggplot2::element_text(size = base_font_size - 0.5),
+      legend.title    = ggplot2::element_text(size = base_font_size, face = "bold"),
       legend.box      = "horizontal",
       legend.position = "bottom",
-      strip.background= element_rect(fill = NA, colour = NA),
-      strip.text      = element_text(face = "bold", size = base_font_size),
-      plot.margin     = margin(2, 2, 2, 2, "pt")
+      strip.background = ggplot2::element_rect(fill = NA, colour = NA),
+      strip.text      = ggplot2::element_text(face = "bold", size = base_font_size),
+      plot.margin     = ggplot2::margin(2, 2, 2, 2, "pt")
     )
 
   n_clusters <- length(unique(enrich_top$Cluster))
   if (is.null(cluster_colors)) {
-    cluster_colors <- hue_pal()(max(n_clusters, 30))
+    cluster_colors <- scales::hue_pal()(max(n_clusters, 30))
   }
 
   plot_list <- list()
 
   if ("bar" %in% plot_types) {
-    p_bar <- ggplot(enrich_top, aes(x = log10FDR, y = reorder(Term_short, log10FDR), fill = Cluster)) +
-      geom_col(width = 0.8, alpha = 0.9) +
-      facet_wrap(~ Cluster, scales = "free_y", ncol = 2) +
-      scale_fill_manual(values = setNames(cluster_colors, unique(enrich_top$Cluster))) +
-      labs(
+    p_bar <- ggplot2::ggplot(enrich_top, ggplot2::aes(x = log10FDR, y = stats::reorder(Term_short, log10FDR), fill = Cluster)) +
+      ggplot2::geom_col(width = 0.8, alpha = 0.9) +
+      ggplot2::facet_wrap(~ Cluster, scales = "free_y", ncol = 2) +
+      ggplot2::scale_fill_manual(values = stats::setNames(cluster_colors, unique(enrich_top$Cluster))) +
+      ggplot2::labs(
         x = expression(-log[10](FDR)),
         y = "Enriched Biological Terms",
         title = "Top Enriched Terms by Cluster"
       ) +
       sci_theme +
-      theme(
-        axis.text.y = element_text(size = base_font_size + 2, lineheight = 0.8),
+      ggplot2::theme(
+        axis.text.y = ggplot2::element_text(size = base_font_size + 2, lineheight = 0.8),
         legend.position = "none"
       )
     plot_list$bar_plot <- p_bar
@@ -506,41 +455,41 @@ plot_enrichment_results <- function(
 
   if ("heatmap" %in% plot_types) {
     p_heatmap <- enrich_top %>%
-      ggplot(aes(x = Cluster, y = reorder(Term_short, log10FDR), fill = log10FDR)) +
-      geom_tile(color = "white", linewidth = 0.8, height = 0.9, width = 0.9) +
-      scale_fill_viridis_c(option = "inferno", name = expression(-log[10](FDR))) +
-      labs(
+      ggplot2::ggplot(ggplot2::aes(x = Cluster, y = stats::reorder(Term_short, log10FDR), fill = log10FDR)) +
+      ggplot2::geom_tile(color = "white", linewidth = 0.8, height = 0.9, width = 0.9) +
+      ggplot2::scale_fill_viridis_c(option = "inferno", name = expression(-log[10](FDR))) +
+      ggplot2::labs(
         x = "Cluster",
         y = "Enriched Biological Terms",
         title = "Enrichment Significance Heatmap"
       ) +
       sci_theme +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_text(size = base_font_size + 2)
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = ggplot2::element_text(size = base_font_size + 2)
       )
     plot_list$heatmap <- p_heatmap
   }
 
   if ("dot" %in% plot_types) {
     p_dot <- enrich_top %>%
-      ggplot(aes(x = Cluster, y = reorder(Term_short, log10FDR), size = GenesN, color = log10FDR)) +
-      geom_point(alpha = 0.85) +
-      scale_color_viridis_c(option = "turbo", name = expression(-log[10](FDR))) +
-      scale_size_continuous(
+      ggplot2::ggplot(ggplot2::aes(x = Cluster, y = stats::reorder(Term_short, log10FDR), size = GenesN, color = log10FDR)) +
+      ggplot2::geom_point(alpha = 0.85) +
+      ggplot2::scale_color_viridis_c(option = "turbo", name = expression(-log[10](FDR))) +
+      ggplot2::scale_size_continuous(
         range = c(3, 10),
         name = "Gene Count",
         breaks = pretty(range(enrich_top$GenesN), n = 4)
       ) +
-      labs(
+      ggplot2::labs(
         x = "Cluster",
         y = "Enriched Biological Terms",
         title = "Enrichment Overview"
       ) +
       sci_theme +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = element_text(size = base_font_size + 2),
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = ggplot2::element_text(size = base_font_size + 2),
         legend.box = "horizontal"
       )
     plot_list$dot_plot <- p_dot
@@ -550,8 +499,8 @@ plot_enrichment_results <- function(
     if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
     for (plot_name in names(plot_list)) {
-      ggsave(file.path(output_dir, paste0(plot_name, ".pdf")),
-             plot_list[[plot_name]], width = 8, height = 10)
+      ggplot2::ggsave(file.path(output_dir, paste0(plot_name, ".pdf")),
+                      plot_list[[plot_name]], width = 8, height = 10)
     }
     message("Plots saved to: ", output_dir)
   }
