@@ -1,4 +1,4 @@
-# Sphinx: Spatial Proteomics Analysis Toolkit <img src="man/figures/logo.png" width="100" align="right"/>
+# Sphinx: Spatial Proteomics Analysis Toolkit <img src="vignettes/logo.png" width="100" align="right"/>
 
 [![R-CMD-check](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![R version](https://img.shields.io/badge/R-%3E%3D4.3-blue)](https://www.r-project.org/)
 
@@ -6,9 +6,9 @@
 
 ## 📖 Overview
 
-::: {align="center"}
+{align="center"}
 <img src="vignettes/workflow.png" width="1000"/>
-:::
+
 
 **Sphinx** is a comprehensive R package for spatial proteomics data analysis, providing a one-stop solution from quality control to biological mechanism discovery. The toolkit integrates four core modules:
 
