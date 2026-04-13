@@ -7,10 +7,6 @@
 ## 📖 Overview
 
 <img src="vignettes/workflow.png" width="1000"/>
-<<<<<<< HEAD
-=======
-
->>>>>>> 951d08eba0973e5769d07bcae9017662ef7aaa74
 
 **Sphinx** is a comprehensive R package for spatial proteomics data analysis, providing a one-stop solution from quality control to biological mechanism discovery. The toolkit integrates four core modules:
 
