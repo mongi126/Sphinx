@@ -18,3 +18,17 @@ ggplot object containing elbow plot
 Creates elbow plot to determine optimal number of PCA dimensions.
 Saves plot to specified path and returns ggplot object.
 }
+\examples{
+if(interactive()){
+# Load and process data
+obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+obj_filtered <- filter_data(obj)
+obj_processed <- process_data(obj_filtered)
+
+# Generate elbow plot with default path
+elbow_plot <- plot_elbow(obj_processed)
+
+# Generate elbow plot with custom path
+elbow_plot <- plot_elbow(obj_processed, save_path = "results/elbow_plot.pdf")
+}
+}

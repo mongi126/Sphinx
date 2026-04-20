@@ -21,3 +21,26 @@ Generates and saves two key visualizations:
 \item Spatial scatter plot showing cluster distribution in tissue context
 }
 }
+\examples{
+if(interactive()){
+# Complete analysis workflow
+# Step 1: Load data
+obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+
+# Step 2: Filter low-quality cells
+obj_filtered <- filter_data(obj)
+
+# Step 3: Process data (normalization, PCA, clustering)
+obj_processed <- process_data(obj_filtered)
+
+# Step 4: Extract coordinates if needed
+obj_processed <- extract_spatial_coordinates(obj_processed)
+
+# Step 5: Visualize results
+plots <- visualize_results(obj_processed, save_dir = "results/")
+
+# Access individual plots
+print(plots$umap_plot)
+print(plots$spatial_plot)
+}
+}

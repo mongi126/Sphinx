@@ -23,3 +23,19 @@ Performs two-step quality control filtering:
 \item Removes cells with low detected feature counts (quantile-based)
 }
 }
+\examples{
+if(interactive()){
+# Load or create a Seurat object first
+obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+
+# Filter with default parameters
+obj_filtered <- filter_data(obj)
+
+# Filter with custom thresholds
+obj_filtered <- filter_data(
+  obj,
+  nCount_mad_threshold = 2.5,
+  nFeature_quantile_threshold = 0.03
+)
+}
+}

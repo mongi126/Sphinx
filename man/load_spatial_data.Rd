@@ -40,3 +40,21 @@ Loads spatial data from either:
 \item Akoya platform data files
 }
 }
+\examples{
+if(interactive()){
+# Load from RDS file
+obj <- load_spatial_data(filename = "spatial_data.rds")
+
+# Load from separate counts and coordinates CSV files
+obj <- load_spatial_data(
+  counts_file = "expression_matrix.csv",
+  coords_file = "cell_coordinates.csv"
+)
+
+# Load Akoya data
+obj <- load_spatial_data(
+  filename = "akoya_output.csv",
+  type = "akoya"
+)
+}
+}

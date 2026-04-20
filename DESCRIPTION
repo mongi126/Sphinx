@@ -55,6 +55,7 @@ Suggests:
     rmarkdown,
     grDevices,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
