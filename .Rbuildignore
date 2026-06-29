@@ -3,7 +3,14 @@
 ^LICENSE\.md$
 ^_pkgdown\.yml$
 ^docs$
+^inst/vignettes/
+^vignettes/.*\.(jpg|jpeg|png)$
+^vignettes/index\.html$
 ^pkgdown$
 ^.*\.Rproj$
 ^\.DS_Store$
 ^build$
+^\.github$
+^cran-comments.md$
+^doc$
+^Meta$

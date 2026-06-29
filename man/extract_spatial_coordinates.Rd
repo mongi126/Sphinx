@@ -16,15 +16,3 @@ Seurat object with coordinates added to metadata (if not already present)
 Extracts spatial coordinates from reduction slot and adds them to object metadata.
 Verifies successful extraction by printing coordinate sample.
 }
-\examples{
-if(interactive()){
-# Load data (coordinates automatically added for CSV input)
-obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-
-# Extract coordinates (if not already in metadata)
-obj <- extract_spatial_coordinates(obj)
-
-# Now coordinates are available in metadata for plotting
-head(obj@meta.data[, c("X", "Y")])
-}
-}

@@ -12,9 +12,16 @@
 \item{n}{number of cells}
 }
 \value{
-selected method name
+list with \code{method} (character) and \code{params} (list of recommended parameters)
 }
 \description{
-Select optimal method based on spatial metrics
+Decision tree (when called from \code{method = "auto"}):
+\enumerate{
+\item n > 50000 -> window
+\item cat_morans_I >= 0.4 -> radius (strong type clustering)
+\item cv_nn_dist < 0.3 -> knn (CSR-like)
+or radius (mild deviation from CSR within the same band)
+\item otherwise -> delaunay (fallback)
+}
 }
 \keyword{internal}

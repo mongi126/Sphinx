@@ -6,6 +6,7 @@ analysis using Sphinx package.
 ## Load Required Packages
 
 ``` r
+
 library(Sphinx)
 library(data.table)
 library(ggplot2)
@@ -15,6 +16,7 @@ library(ComplexHeatmap)
 ## 1.Data Preparation
 
 ``` r
+
 # Load spatial metadata
 df <- fread("tsu35_metadata.csv")
 
@@ -27,6 +29,7 @@ df <- prepare_data(df,
 ### Spatial Distribution of Cell Types
 
 ``` r
+
 visualize_spatial_distribution(
   df,
   x_col = "X",
@@ -44,6 +47,7 @@ visualize_spatial_distribution(
 ## 2.Spatial Distance Analysis
 
 ``` r
+
 # Calculate optimal radius for neighborhood definition
 dist_info <- calculate_optimal_radius(df)
 message("Recommended radius: ", round(dist_info$recommended_radius, 2))
@@ -56,12 +60,14 @@ visualize_distance_heatmap(dist_result)
 ![](02_distance_heatmap.jpg)
 
 ``` r
+
 visualize_distance_parallel(dist_result)
 ```
 
 ## 3.Spatial Network Construction
 
 ``` r
+
 # Build spatial network using automatic method selection
 spatial_edges <- build_spatial_network(
   df,
@@ -73,6 +79,7 @@ spatial_edges <- build_spatial_network(
 ## 4.Neighborhood Feature Calculation
 
 ``` r
+
 # Calculate neighborhood composition features
 feature_df <- calculate_neighborhood_features(
   df, 
@@ -84,6 +91,7 @@ feature_df <- calculate_neighborhood_features(
 ## 5.Neighborhood Clustering
 
 ``` r
+
 # Cluster neighborhoods based on spatial features
 clustered_df <- cluster_neighborhoods(
   feature_df = feature_df,
@@ -98,6 +106,7 @@ message("Identified ", length(unique(clustered_df$Neighborhood_Cluster)), " neig
 ### Neighborhood Clusters
 
 ``` r
+
 visualize_spatial_distribution(
   clustered_df,
   x_col = "X", 
@@ -114,6 +123,7 @@ visualize_spatial_distribution(
 ### Cluster Composition
 
 ``` r
+
 # Calculate cluster composition
 comp_df <- calculate_cluster_composition(
   clustered_df,
@@ -135,6 +145,7 @@ plot_composition_barplot(
 ### Voronoi Diagram
 
 ``` r
+
 visualize_voronoi(
   clustered_df,
   coloring = "neighborhood",
@@ -148,6 +159,7 @@ visualize_voronoi(
 ## 6.Spatial Interaction Analysis
 
 ``` r
+
 # Analyze cell-cell spatial interactions
 interaction_results <- analyze_spatial_interactions(
   clustered_df,
@@ -159,6 +171,7 @@ interaction_results <- analyze_spatial_interactions(
 ### Cell-Cell Interactions
 
 ``` r
+
 visualize_interaction_heatmap(
   interaction_results$interaction_matrix, 
   transform = TRUE
@@ -170,6 +183,7 @@ visualize_interaction_heatmap(
 ### Spatial Network Visualization
 
 ``` r
+
 visualize_spatial_network(
   clustered_df,
   spatial_edges,
@@ -191,6 +205,7 @@ visualize_spatial_network(
 ### Interaction Network Graph
 
 ``` r
+
 visualize_interaction_network(
   interaction_results$network,
   node_size_range = c(5, 15),
@@ -206,6 +221,7 @@ visualize_interaction_network(
 ## 7.Neighborhood Purity Analysis
 
 ``` r
+
 # Calculate neighborhood purity using radius method
 neighborhood_purity <- calculate_neighborhood_purity(
   clustered_df,
@@ -222,6 +238,7 @@ neighborhood_purity <- calculate_neighborhood_purity(
 ### Neighborhood Purity Graph
 
 ``` r
+
 visualize_neighborhood_purity(
     neighborhood_purity,
     x_col = "X",

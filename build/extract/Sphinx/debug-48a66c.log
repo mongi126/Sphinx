@@ -1,0 +1,12 @@
+{"sessionId":"48a66c","runId":"rcmdcheck","hypothesisId":"A","location":"debug_rcmdcheck.R","message":"Pre-check config","data":{"vignettes_in_buildignore":false,"inst_vignettes_ignored":true},"timestamp":1782718546000} 
+{"sessionId":"48a66c","runId":"rcmdcheck","hypothesisId":"B","location":"debug_rcmdcheck.R","message":"rcmdcheck summary","data":{"errors":0,"warnings":0,"notes":2,"note_texts":["checking installed package size ... NOTE
+  installed size is 50.4Mb
+  sub-directories of 1Mb or more:
+    doc   49.2Mb
+    help   1.0Mb","checking R code for possible problems ... NOTE
+plot_enrichment_results: no visible global function definition for
+  'scale_fill_viridis_c'
+plot_enrichment_results: no visible global function definition for
+  'scale_color_viridis_c'
+Undefined global functions or variables:
+  scale_color_viridis_c scale_fill_viridis_c"]},"timestamp":1782719105000} 

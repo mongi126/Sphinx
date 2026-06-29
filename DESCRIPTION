@@ -2,7 +2,7 @@ Package: Sphinx
 Type: Package
 Title: Spatial Proteomics and Histology Integrated Analysis
 Version: 1.0.0
-Date: 2025-09-24
+Date: 2026-06-29
 Authors@R: 
     person("Mengyi", "Yan", email = "mongi126@163.com", role = c("aut", "cre"))
 Description: A comprehensive toolkit for spatial proteomics data analysis, 
@@ -10,7 +10,7 @@ Description: A comprehensive toolkit for spatial proteomics data analysis,
     and functional enrichment. Supports various spatial platforms and 
     provides publication-ready visualizations.
 License: MIT + file LICENSE
-URL: https://github.com/mongi126/Sphinx
+URL: https://mongi126.github.io/Sphinx/, https://github.com/mongi126/Sphinx
 BugReports: https://github.com/mongi126/Sphinx/issues
 Depends: 
     R (>= 4.3.0)
@@ -55,9 +55,9 @@ Suggests:
     rmarkdown,
     grDevices,
     testthat (>= 3.0.0)
-VignetteBuilder: knitr
 Encoding: UTF-8
 LazyData: true
+VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Config/Note: 'Full vignettes available on GitHub'

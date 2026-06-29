@@ -6,6 +6,7 @@ clusters in spatial proteomics data using Sphinx.
 ## Load Required Packages
 
 ``` r
+
 library(Sphinx)
 library(Seurat)
 library(ggplot2)
@@ -16,6 +17,7 @@ library(dplyr)
 ## 1. Load Processed Data
 
 ``` r
+
 # Load preprocessed spatial data
 codex.obj <- readRDS("cycif1_processed.rds")
 
@@ -26,6 +28,7 @@ print(codex.obj)
 ## 2. Identify Marker Proteins
 
 ``` r
+
 # Identify top marker proteins for each cluster
 top5 <- find_top_markers(
   codex.obj, 
@@ -42,6 +45,7 @@ head(top5)
 ### Violin Plots
 
 ``` r
+
 # Create violin plots for all detected proteins
 plot_marker_violin(
   codex.obj, 
@@ -59,6 +63,7 @@ clusters.*
 ### Marker Heatmap
 
 ``` r
+
 # Create heatmap of top marker expression
 plot_marker_heatmap(
   codex.obj,
@@ -74,6 +79,7 @@ plot_marker_heatmap(
 ### Visualize marker expression in UMAP space
 
 ``` r
+
 plot_umap_markers(codex.obj, 
                   markers = c("CD31", "CD19", "Pan-Cytokeratin",
                               "a-SMA","CD8","CD4"))
@@ -86,6 +92,7 @@ plot_umap_markers(codex.obj,
 ### Visualize marker expression in spatial coordinates
 
 ``` r
+
 plot_spatial_markers(codex.obj, 
                   markers = c("CD31", "CD19", "Pan-Cytokeratin",
                               "a-SMA","CD8","CD4"),
@@ -125,6 +132,7 @@ table(codex.obj$celltype)
 ### Annotated UMAP
 
 ``` r
+
 # Create UMAP colored by cell types
 plot_annotated_umap(
   codex.obj,
@@ -139,6 +147,7 @@ plot_annotated_umap(
 ### Spatial Distribution
 
 ``` r
+
 # Visualize spatial distribution of cell types
 plot_spatial_distribution(
   codex.obj,
@@ -154,6 +163,7 @@ coordinates.*
 ## 6. Save Results
 
 ``` r
+
 # Save annotated object
 saveRDS(codex.obj, file = "tsu33_celltype.rds")
 

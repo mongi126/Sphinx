@@ -1,4 +1,4 @@
----
+﻿---
 title: "Installation"
 output: rmarkdown::html_vignette
 vignette: >

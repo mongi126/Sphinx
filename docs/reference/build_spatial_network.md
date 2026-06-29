@@ -15,7 +15,7 @@ build_spatial_network(
   radius = NULL,
   window_size = NULL,
   max_edges = 1e+06,
-  celltype_col = "annotation",
+  celltype_col = "celltype",
   verbose = TRUE
 )
 ```

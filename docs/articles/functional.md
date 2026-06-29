@@ -7,6 +7,7 @@ processes.
 ## Load Required Packages
 
 ``` r
+
 library(Sphinx)
 library(ComplexHeatmap)
 library(clusterProfiler)
@@ -21,6 +22,7 @@ library(patchwork)
 ## 1. Load Data
 
 ``` r
+
 # Load neighborhood clustering results
 df <- read.csv("results.csv")
 
@@ -37,6 +39,7 @@ message("Protein data: ", nrow(protein), " proteins x ", ncol(protein), " cells"
 ## 2. Prepare Protein Data
 
 ``` r
+
 # Merge neighborhood clusters with protein expression
 protein_df <- prepare_protein_data(df, protein)
 
@@ -48,6 +51,7 @@ message("NA values in key proteins: ", sum(is.na(protein_df$PD.1)))
 ## 3. Differential Expression Analysis
 
 ``` r
+
 # Perform differential expression between neighborhoods
 diff_results <- perform_differential_expression(protein_df)
 
@@ -62,6 +66,7 @@ table(diff_results$Significance)
 ## 4. Volcano Plot Visualization
 
 ``` r
+
 # Generate volcano plots for all clusters
 volcano_all <- plot_volcano_all_clusters(diff_results)
 
@@ -75,6 +80,7 @@ ggsave("VolcanoPlots_AllClusters.pdf", volcano_all, width = 10, height = 20)
 ## 5. Functional Enrichment Analysis
 
 ``` r
+
 # Perform enrichment analysis using human databases
 cluster_enrich <- perform_cluster_enrichment(
   diff_results, 
@@ -95,6 +101,7 @@ Functions - KEGG Pathways - Reactome Pathways - CORUM Complexes
 ## 6. Visualize Enrichment Results
 
 ``` r
+
 # Generate publication-quality enrichment plots
 plots <- plot_enrichment_results(
   cluster_enrich,

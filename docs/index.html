@@ -20,7 +20,7 @@
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Spatial Proteomics and Histology Integrated Analysis">
 <meta name="description" content="A comprehensive toolkit for spatial proteomics data analysis, including preprocessing, clustering, annotation, spatial network analysis, and functional enrichment. Supports various spatial platforms and provides publication-ready visualizations.">
 <meta property="og:description" content="A comprehensive toolkit for spatial proteomics data analysis, including preprocessing, clustering, annotation, spatial network analysis, and functional enrichment. Supports various spatial platforms and provides publication-ready visualizations.">
-<meta property="og:image" content="https://github.com/mongi126/Sphinx/logo.png">
+<meta property="og:image" content="https://mongi126.github.io/Sphinx/logo.png">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -58,7 +58,7 @@
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Functions</a></li>
       </ul>
 <ul class="navbar-nav">
-<li class="nav-item"><a class="nav-link" href="https://github.com/mongi126/Sphinx" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/mongi126/Sphinx" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -68,58 +68,113 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header">
-<img src="logo.png" class="logo" alt=""><h1 id="id_-sphinx">
- Sphinx<a class="anchor" aria-label="anchor" href="#id_-sphinx"></a>
+<img src="logo.png" class="logo" alt=""><h1 id="sphinx">Sphinx<a class="anchor" aria-label="anchor" href="#sphinx"></a>
 </h1>
 </div>
-<p>A comprehensive toolkit for spatial proteomics data analysis, including preprocessing, clustering, annotation, spatial network analysis, and functional enrichment. Supports various spatial platforms and provides publication-ready visualizations.</p>
+<p><strong>Sphinx</strong> is an R package for <strong>spatial proteomics analysis</strong>. It provides an end-to-end workflow from raw counts to biological interpretation — including preprocessing, cell annotation, spatial neighborhood modeling, and functional enrichment.</p>
+<p>Supported platforms include CODEX, CyCIF, IMC, and other tabular spatial proteomics formats with x/y coordinates.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Install development version from GitHub</span></span>
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"mongi126/Sphinx"</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/mongi126/Sphinx">Sphinx</a></span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co"># Check if package loaded correctly</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"Sphinx"</span><span class="op">)</span></span></code></pre>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mongi126.github.io/Sphinx/">Sphinx</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"Sphinx"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+</h2>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mongi126.github.io/Sphinx/">Sphinx</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 1. Preprocessing</span></span>
+<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/load_spatial_data.html">load_spatial_data</a></span><span class="op">(</span><span class="st">"your_data.csv"</span><span class="op">)</span></span>
+<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/filter_data.html">filter_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/process_data.html">process_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 2. Cell annotation</span></span>
+<span><span class="va">markers</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/find_top_markers.html">find_top_markers</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span><span class="va">obj</span>     <span class="op">&lt;-</span> <span class="fu"><a href="reference/annotate_celltypes.html">annotate_celltypes</a></span><span class="op">(</span><span class="va">obj</span>, <span class="va">cluster</span>, <span class="va">markers</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 3. Spatial network</span></span>
+<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/prepare_data.html">prepare_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span><span class="va">net</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/build_spatial_network.html">build_spatial_network</a></span><span class="op">(</span><span class="va">obj</span>, method <span class="op">=</span> <span class="st">"knn"</span><span class="op">)</span></span>
+<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/calculate_neighborhood_features.html">calculate_neighborhood_features</a></span><span class="op">(</span><span class="va">obj</span>, <span class="va">net</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 4. Functional analysis</span></span>
+<span><span class="va">de_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/perform_differential_expression.html">perform_differential_expression</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span><span class="va">enrichment</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/perform_cluster_enrichment.html">perform_cluster_enrichment</a></span><span class="op">(</span><span class="va">de_results</span><span class="op">)</span></span></code></pre></div>
+<p>See the <a href="articles/workflow.html">Workflow</a> article for a guided overview, or jump directly to module tutorials below.</p>
 </div>
 <div class="section level2">
 <h2 id="workflow">Workflow<a class="anchor" aria-label="anchor" href="#workflow"></a>
 </h2>
-<p><img src="reference/figures/workflow.png"></p>
-<p><strong>Module 1. Data Preprocessing</strong></p>
+<div class="section level3">
+<h3 id="module-1-data-preprocessing">Module 1. Data preprocessing<a class="anchor" aria-label="anchor" href="#module-1-data-preprocessing"></a>
+</h3>
 <ul>
-<li>Data import and format standardization</li>
-<li>Filtering of low-quality cells and proteins</li>
-<li>Normalization and noise reduction</li>
-<li>Extraction of spatial coordinates</li>
+<li>Data import and format standardization (<a href="reference/load_spatial_data.html"><code>load_spatial_data()</code></a>)</li>
+<li>Filtering of low-quality cells and proteins (<a href="reference/filter_data.html"><code>filter_data()</code></a>)</li>
+<li>Normalization, scaling, and clustering (<a href="reference/process_data.html"><code>process_data()</code></a>)</li>
+<li>Extraction of spatial coordinates (<a href="reference/extract_spatial_coordinates.html"><code>extract_spatial_coordinates()</code></a>)</li>
 </ul>
-<p><strong>Module 2. Cell Annotation</strong></p>
+<p><strong>Tutorial:</strong> <a href="articles/preprocessing.html">Data Preprocessing</a></p>
+</div>
+<div class="section level3">
+<h3 id="module-2-cell-annotation">Module 2. Cell annotation<a class="anchor" aria-label="anchor" href="#module-2-cell-annotation"></a>
+</h3>
 <ul>
-<li>Discovery of cell-type-specific marker proteins</li>
+<li>Discovery of cell-type-specific marker proteins (<a href="reference/find_top_markers.html"><code>find_top_markers()</code></a>)</li>
 <li>UMAP and spatial visualization</li>
-<li>Automatic or semi-automatic cell type annotation</li>
+<li>Automatic or semi-automatic cell type annotation (<a href="reference/annotate_celltypes.html"><code>annotate_celltypes()</code></a>)</li>
 </ul>
-<p><strong>Module 3. Spatial Neighborhood and Network</strong></p>
+<p><strong>Tutorial:</strong> <a href="articles/annotation.html">Cell Annotation</a></p>
+</div>
+<div class="section level3">
+<h3 id="module-3-spatial-neighborhood-and-network">Module 3. Spatial neighborhood and network<a class="anchor" aria-label="anchor" href="#module-3-spatial-neighborhood-and-network"></a>
+</h3>
 <ul>
-<li>Neighborhood network construction (kNN, Delaunay, radius, window)</li>
-<li>Calculation of neighborhood features</li>
+<li>Auto neighborhood network construction — kNN, Delaunay, radius, and window methods (<a href="reference/build_spatial_network.html"><code>build_spatial_network()</code></a>)</li>
+<li>Calculation of neighborhood features (<a href="reference/calculate_neighborhood_features.html"><code>calculate_neighborhood_features()</code></a>)</li>
 <li>Clustering and spatial visualization</li>
-<li>Cell–cell interaction analysis</li>
+<li>Cell–cell interaction analysis (<a href="reference/analyze_spatial_interactions.html"><code>analyze_spatial_interactions()</code></a>)</li>
 </ul>
-<p><strong>Module 4. Functional Analysis</strong></p>
+<p><strong>Tutorial:</strong> <a href="articles/spatial-network.html">Spatial Network Analysis</a></p>
+</div>
+<div class="section level3">
+<h3 id="module-4-functional-analysis">Module 4. Functional analysis<a class="anchor" aria-label="anchor" href="#module-4-functional-analysis"></a>
+</h3>
 <ul>
-<li>Differential protein analysis</li>
-<li>Cluster-specific pathway enrichment (GO, KEGG, Reactome)</li>
-<li>Visualization of enrichment results</li>
+<li>Differential protein analysis (<a href="reference/perform_differential_expression.html"><code>perform_differential_expression()</code></a>)</li>
+<li>Cluster-specific pathway enrichment — GO, KEGG, Reactome (<a href="reference/perform_cluster_enrichment.html"><code>perform_cluster_enrichment()</code></a>)</li>
+<li>Visualization of enrichment results (<a href="reference/plot_enrichment_results.html"><code>plot_enrichment_results()</code></a>)</li>
+</ul>
+<p><strong>Tutorial:</strong> <a href="articles/functional.html">Functional Analysis</a></p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="getting-help">Getting help<a class="anchor" aria-label="anchor" href="#getting-help"></a>
+</h2>
+<ul>
+<li>
+<strong>Function reference:</strong> <a href="reference/index.html">All functions</a>
+</li>
+<li>
+<strong>Report issues:</strong> <a href="https://github.com/mongi126/Sphinx/issues" class="external-link">GitHub Issues</a>
+</li>
+<li>
+<strong>In R:</strong> <code><a href="https://github.com/mongi126/Sphinx/reference" class="external-link">help(package = "Sphinx")</a></code>
+</li>
 </ul>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
-<li><a href="https://github.com/mongi126/Sphinx/">Browse source code</a></li>
-<li><a href="https://github.com/mongi126/Sphinx/issues">Report a bug</a></li>
+<li><a href="https://github.com/mongi126/Sphinx/" class="external-link">Browse source code</a></li>
+<li><a href="https://github.com/mongi126/Sphinx/issues" class="external-link">Report a bug</a></li>
 </ul>
 </div>
 

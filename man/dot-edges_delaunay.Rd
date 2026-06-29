@@ -4,10 +4,12 @@
 \alias{.edges_delaunay}
 \title{Build edges using Delaunay triangulation}
 \usage{
-.edges_delaunay(df)
+.edges_delaunay(df, max_edge_length = NULL)
 }
 \arguments{
 \item{df}{data.table with spatial data}
+
+\item{max_edge_length}{optional maximum edge length filter}
 }
 \value{
 data.table with edges

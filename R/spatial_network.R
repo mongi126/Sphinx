@@ -1,34 +1,5 @@
 # R/spatial_network.R
 
-#' @importFrom stats setNames complete.cases dist quantile sd
-#' @importFrom utils installed.packages
-#' @importFrom data.table as.data.table is.data.table setnames copy rbindlist
-#'   setattr setkey .I .SD .N
-#' @importFrom RANN nn2
-#' @importFrom deldir deldir triang.list tile.list
-#' @importFrom igraph graph_from_data_frame V E degree strength
-#'   vcount induced_subgraph cluster_louvain
-#' @importFrom ggraph ggraph geom_edge_link geom_node_point geom_node_text
-#' @importFrom ggplot2 ggplot aes geom_polygon geom_point geom_segment geom_tile
-#'   geom_text geom_col geom_line scale_color_manual scale_fill_manual
-#'   scale_size_continuous scale_alpha_continuous scale_color_viridis_c
-#'   scale_fill_gradientn scale_color_identity scale_alpha_manual
-#'   theme_void theme_minimal theme_bw element_text element_rect
-#'   element_line element_blank labs coord_fixed xlim ylim guides
-#'   guide_legend ggsave margin
-#' @importFrom scales hue_pal percent_format rescale
-#' @importFrom reshape2 melt
-#' @importFrom ComplexHeatmap Heatmap rowAnnotation anno_barplot
-#' @importFrom circlize colorRamp2
-#' @importFrom grid gpar unit
-#' @importFrom grDevices pdf dev.off colorRampPalette
-#' @importFrom RColorBrewer brewer.pal
-#' @importFrom dplyr group_by summarise mutate ungroup filter arrange desc
-#' @importFrom tidyr pivot_wider
-#' @importFrom tibble deframe
-#' @importFrom purrr map_df
-NULL
-
 #' Prepare spatial data for network analysis
 #'
 #' @param df Data frame containing spatial data
@@ -74,11 +45,21 @@ prepare_data <- function(df,
   } else if ("V1" %in% names(df)) {
     data.table::setnames(df, "V1", "Cell_ID")
   } else if (!"Cell_ID" %in% names(df)) {
-    # No suitable column found, create new one named Cell_ID
-    df[, Cell_ID := .I]
+    if ("cell" %in% names(df)) {
+      data.table::setnames(df, "cell", "Cell_ID")
+    } else {
+      # No suitable column found, create new one named Cell_ID
+      df[, Cell_ID := .I]
+    }
   }
 
   # 2. Standardize coordinate column names
+  if (!"X" %in% names(df) && x_col == "X" && "x" %in% names(df)) {
+    x_col <- "x"
+  }
+  if (!"Y" %in% names(df) && y_col == "Y" && "y" %in% names(df)) {
+    y_col <- "y"
+  }
   if (x_col != "X" && x_col %in% names(df)) {
     if ("X" %in% names(df)) {
       df[, X := NULL]
@@ -115,16 +96,18 @@ prepare_data <- function(df,
 #'
 #' @param df Spatial data with coordinates
 #' @param sample_size Maximum cells to sample for efficiency (default: 1000)
-#' @param multiplier Factor for recommended radius (default: 1.5)
+#' @param multiplier Factor for recommended radius (default: 2.0)
 #' @param x_col Column name for X coordinates (default: "X")
 #' @param y_col Column name for Y coordinates (default: "Y")
+#' @param k_nn Nearest-neighbor rank used for distance summary (default: 10)
 #' @return List with distance statistics and recommended parameters
 #' @export
 calculate_optimal_radius <- function(df,
                                      sample_size = 1000,
-                                     multiplier = 1.5,
+                                     multiplier = 2.0,
                                      x_col = "X",
-                                     y_col = "Y") {
+                                     y_col = "Y",
+                                     k_nn = 10L) {
   if (!requireNamespace("RANN", quietly = TRUE)) {
     stop("Package 'RANN' is required. Please install it.")
   }
@@ -145,9 +128,11 @@ calculate_optimal_radius <- function(df,
 
   coords <- as.matrix(coords)
 
-  # Nearest neighbor distance (second nearest)
-  nn <- RANN::nn2(coords, k = 2)
-  min_dists <- nn$nn.dists[, 2]
+  k_nn <- as.integer(k_nn)
+  if (k_nn < 1L) stop("k_nn must be at least 1")
+  k_query <- min(k_nn + 1L, nrow(coords))
+  nn <- RANN::nn2(coords, k = k_query)
+  nn_dists <- nn$nn.dists[, k_query]
 
   # Sample to calculate all pairwise distances
   set.seed(123)
@@ -156,16 +141,59 @@ calculate_optimal_radius <- function(df,
   all_dists <- as.vector(stats::dist(coords[sample_idx, ]))
   all_dists <- all_dists[all_dists > 0]
 
-  # Recommended radius
-  recommended_radius <- stats::quantile(min_dists, 0.9, na.rm = TRUE)
+  # Recommended radius: k_nn-th NN distance (90th percentile) scaled by multiplier
+  recommended_radius <- as.numeric(stats::quantile(nn_dists, 0.9, na.rm = TRUE)) * multiplier
 
   return(list(
     recommended_radius = recommended_radius,
-    min_radius = min(min_dists, na.rm = TRUE),
-    max_radius = max(min_dists, na.rm = TRUE),
-    min_dists = min_dists,
+    min_radius = min(nn_dists, na.rm = TRUE),
+    max_radius = max(nn_dists, na.rm = TRUE),
+    min_dists = nn_dists,
+    k_nn = k_query - 1L,
     all_dists = all_dists
   ))
+}
+
+#' Calculate optimal window size (Stereopy CCD-style)
+#'
+#' @param df Spatial data with coordinates
+#' @param x_col Column name for X coordinates (default: "X")
+#' @param y_col Column name for Y coordinates (default: "Y")
+#' @param min_cells Target minimum mean cells per window (default: 30)
+#' @param max_cells Target maximum mean cells per window (default: 50)
+#' @param range_divisor Divisor for initial window size from spatial range (default: 100)
+#' @param max_iter Maximum adjustment iterations (default: 100)
+#' @return List with window_size, sliding_step, mean_cells, x_range, y_range
+#' @export
+calculate_optimal_window_size <- function(df,
+                                          x_col = "X",
+                                          y_col = "Y",
+                                          min_cells = 30L,
+                                          max_cells = 50L,
+                                          range_divisor = 100L,
+                                          max_iter = 100L) {
+  x <- as.numeric(as.character(df[[x_col]]))
+  y <- as.numeric(as.character(df[[y_col]]))
+  ok <- stats::complete.cases(x, y)
+  x <- x[ok]
+  y <- y[ok]
+  if (length(x) < 1L) {
+    stop("No valid coordinates after removing NAs.")
+  }
+  res <- .calc_stereopy_window_size(
+    x, y,
+    min_cells = min_cells,
+    max_cells = max_cells,
+    range_divisor = range_divisor,
+    max_iter = max_iter
+  )
+  c(
+    res,
+    list(
+      x_range = diff(range(x, na.rm = TRUE)),
+      y_range = diff(range(y, na.rm = TRUE))
+    )
+  )
 }
 
 #' Calculate distances between cell types
@@ -275,21 +303,23 @@ build_spatial_network <- function(
     radius = NULL,
     window_size = NULL,
     max_edges = 1e6,
-    celltype_col = "annotation",
+    celltype_col = "celltype",
     verbose = TRUE
 ) {
   # ---- Check required packages ----
   req <- c("data.table","RANN")
-  miss <- req[!vapply(req, requireNamespace, quiet = TRUE, FUN.VALUE = logical(1))]
+  miss <- req[!vapply(req, function(p) requireNamespace(p, quietly = TRUE), logical(1))]
   if (length(miss)) stop("Missing packages: ", paste(miss, collapse = ", "))
 
   if (!data.table::is.data.table(df)) {
     df <- data.table::as.data.table(df)
   }
 
-  need <- c("X","Y","Cell_ID")
-  if (!all(need %in% names(df))) {
-    stop("`df` must contain columns: ", paste(need, collapse = ", "))
+  if (!all(c("X", "Y", "Cell_ID") %in% names(df))) {
+    df <- prepare_data(df, celltype_col = celltype_col)
+  }
+  if (!all(c("X", "Y", "Cell_ID") %in% names(df))) {
+    stop("`df` must contain coordinates (X/Y or x/y) and cell IDs (Cell_ID or cell)")
   }
 
   if (nrow(df) < 2) {
@@ -299,22 +329,46 @@ build_spatial_network <- function(
   # ---- Calculate spatial metrics (guide auto choices + sensible defaults) ----
   metrics <- .calc_spatial_metrics(df, celltype_col = celltype_col)
 
-  # Sensible defaults if not provided
-  if (is.null(k)) {
-    k <- max(4, min(30, round(8 + log10(max(10, nrow(df))) * 4)))
-  }
-  if (is.null(radius)) {
-    radius <- metrics$mean_nn_dist * 1.6
-  }
-  if (is.null(window_size)) {
-    window_size <- metrics$mean_nn_dist * 6
+  # ---- Auto method selection (returns method + recommended params) ----
+  chosen <- method
+  auto_params <- list()
+  if (method == "auto") {
+    sel <- .select_method(metrics, nrow(df))
+    chosen <- sel$method
+    auto_params <- sel$params
   }
 
-  # ---- Auto method selection ----
-  chosen <- method
-  if (method == "auto") {
-    chosen <- .select_method(metrics, nrow(df))
+  # Resolve parameters: user override > auto recommendation > generic default
+  if (is.null(k)) {
+    k <- if (!is.null(auto_params$k)) {
+      auto_params$k
+    } else {
+      max(4, min(30, round(8 + log10(max(10, nrow(df))) * 4)))
+    }
   }
+  if (is.null(radius)) {
+    radius <- if (!is.null(auto_params$radius)) {
+      auto_params$radius
+    } else {
+      .default_search_radius(metrics$mean_nn_dist)
+    }
+  }
+  if (is.null(window_size)) {
+    if (!is.null(auto_params$window_size)) {
+      window_size <- auto_params$window_size
+      window_slide_step <- auto_params$window_slide_step
+    } else {
+      opt_win <- .calc_stereopy_window_size(df$X, df$Y)
+      window_size <- opt_win$window_size
+      window_slide_step <- opt_win$sliding_step
+    }
+  } else {
+    window_slide_step <- max(1L, as.integer(window_size) %/% 2L)
+  }
+  if (is.null(window_slide_step)) {
+    window_slide_step <- max(1L, as.integer(window_size) %/% 2L)
+  }
+  max_edge_length <- auto_params$max_edge_length
 
   if (verbose) {
     msg <- paste0(
@@ -325,7 +379,7 @@ build_spatial_network <- function(
       " | meanNN=", round(metrics$mean_nn_dist,3),
       " | cvNN=", round(metrics$cv_nn_dist,3),
       " | CE_R=", round(metrics$clark_evans_R,3),
-      " | MoranI=", round(metrics$morans_I,3),
+      " | CatMoranI=", round(metrics$cat_morans_I,3),
       " | Het(GS)=", round(metrics$het_gini_simpson,3)
     )
     message(msg)
@@ -336,7 +390,7 @@ build_spatial_network <- function(
     chosen,
     knn      = .edges_knn(df, k = k),
     radius   = .edges_radius(df, radius = radius, k_cap = max(20, k * 3)),
-    delaunay = .edges_delaunay(df),
+    delaunay = .edges_delaunay(df, max_edge_length = max_edge_length),
     window   = .edges_window(df, k = min(k, 10), tile = window_size),
     stop("Unknown method: ", chosen)
   )
@@ -365,7 +419,13 @@ build_spatial_network <- function(
 
   data.table::setattr(edges, "metrics", metrics)
   data.table::setattr(edges, "method", chosen)
-  data.table::setattr(edges, "parameters", list(k = k, radius = radius, window_size = window_size))
+  data.table::setattr(edges, "parameters", list(
+    k = k,
+    radius = radius,
+    window_size = window_size,
+    window_slide_step = window_slide_step,
+    max_edge_length = max_edge_length
+  ))
   data.table::setkey(edges, from, to)
 
   return(edges)
@@ -375,27 +435,208 @@ build_spatial_network <- function(
 # Internal helper functions
 # =====================
 
+#' Default nearest-neighbor rank for local spacing summaries
+#' @keywords internal
+.default_nn_rank <- function() 10L
+
+#' Per-cell distance to the k-th nearest neighbor (excluding self)
+#' @param coords numeric matrix with X/Y columns
+#' @param k_nn neighbor rank (default: 10)
+#' @return numeric vector of k_nn-th NN distances per cell
+#' @keywords internal
+.nn_dist_at_rank <- function(coords, k_nn = .default_nn_rank()) {
+  n <- nrow(coords)
+  if (n < 2L) return(rep(NA_real_, n))
+  k_nn <- as.integer(k_nn)
+  if (k_nn < 1L) stop("k_nn must be at least 1")
+  k_query <- min(k_nn + 1L, n)
+  nn <- RANN::nn2(coords, coords, k = k_query)
+  nn$nn.dists[, k_query]
+}
+
+#' Default search radius from mean NN distance
+#' @param mean_nn_dist mean k-th nearest-neighbor distance
+#' @param multiplier scale factor (default: 2.0)
+#' @return numeric search radius
+#' @keywords internal
+.default_search_radius <- function(mean_nn_dist, multiplier = 2.0) {
+  mean_nn_dist * multiplier
+}
+
+#' Round to the nearest even integer (minimum 2)
+#' @keywords internal
+.round_to_even <- function(x) {
+  r <- 2 * round(x / 2)
+  max(2L, as.integer(r))
+}
+
+#' Number of grid windows covering the spatial extent (Stereopy-style binning)
+#' @keywords internal
+.n_grid_windows <- function(x, y, win_size) {
+  xmin <- min(x, na.rm = TRUE)
+  xmax <- max(x, na.rm = TRUE)
+  ymin <- min(y, na.rm = TRUE)
+  ymax <- max(y, na.rm = TRUE)
+  nx <- floor(xmax / win_size) - floor(xmin / win_size) + 1L
+  ny <- floor(ymax / win_size) - floor(ymin / win_size) + 1L
+  max(1L, nx) * max(1L, ny)
+}
+
+#' Mean cells per grid window over the full tissue grid
+#' @keywords internal
+.mean_cells_per_window_grid <- function(x, y, win_size) {
+  length(x) / .n_grid_windows(x, y, win_size)
+}
+
+#' Optimal window size via Stereopy CCD iterative adjustment
+#' @keywords internal
+.calc_stereopy_window_size <- function(x,
+                                       y,
+                                       min_cells = 30L,
+                                       max_cells = 50L,
+                                       range_divisor = 100L,
+                                       max_iter = 100L) {
+  x_range <- diff(range(x, na.rm = TRUE))
+  y_range <- diff(range(y, na.rm = TRUE))
+  if (!is.finite(x_range) || !is.finite(y_range) || x_range <= 0 || y_range <= 0) {
+    return(list(window_size = 2L, sliding_step = 1L, mean_cells = NA_real_))
+  }
+
+  win_size <- .round_to_even(min(x_range, y_range) / range_divisor)
+  mean_cells <- NA_real_
+  iter <- 0L
+
+  while (iter < max_iter) {
+    mean_cells <- .mean_cells_per_window_grid(x, y, win_size)
+    if (mean_cells >= min_cells && mean_cells <= max_cells) break
+    if (mean_cells < min_cells) {
+      win_size <- .round_to_even(win_size * 1.1)
+    } else {
+      win_size <- .round_to_even(win_size * 0.9)
+    }
+    iter <- iter + 1L
+  }
+
+  if (iter >= max_iter) {
+    warning(
+      "Optimal window size not obtained in ", max_iter,
+      " iterations (mean cells per window: ", round(mean_cells, 2), ")."
+    )
+  }
+
+  list(
+    window_size = win_size,
+    sliding_step = max(1L, win_size %/% 2L),
+    mean_cells = mean_cells
+  )
+}
+
+#' Resolve X/Y coordinate column names
+#' @param df data.frame/data.table
+#' @param x_col optional explicit X column name
+#' @param y_col optional explicit Y column name
+#' @return named character vector c(x = ..., y = ...)
+#' @keywords internal
+.resolve_xy_cols <- function(df, x_col = NULL, y_col = NULL) {
+  nm <- names(df)
+  pick <- function(explicit, candidates) {
+    if (!is.null(explicit)) {
+      if (!explicit %in% nm) {
+        stop("Coordinate column '", explicit, "' not found in data")
+      }
+      return(explicit)
+    }
+    hit <- candidates[candidates %in% nm]
+    if (length(hit)) return(hit[1L])
+    stop(
+      "Could not find coordinate columns. Specify x_col/y_col explicitly, ",
+      "or include one of: ", paste(candidates, collapse = ", ")
+    )
+  }
+  c(
+    x = pick(x_col, c("X", "x")),
+    y = pick(y_col, c("Y", "y"))
+  )
+}
+
+#' Extract numeric X/Y coordinate matrix from a data frame
+#' @param df data.frame/data.table
+#' @param x_col optional explicit X column name
+#' @param y_col optional explicit Y column name
+#' @return numeric matrix with columns X and Y
+#' @keywords internal
+.extract_xy_matrix <- function(df, x_col = NULL, y_col = NULL) {
+  cols <- .resolve_xy_cols(df, x_col, y_col)
+  mat <- cbind(
+    as.numeric(as.character(df[[cols["x"]]])),
+    as.numeric(as.character(df[[cols["y"]]]))
+  )
+  colnames(mat) <- c("X", "Y")
+  mat
+}
+
+#' Categorical Moran's I via proportion-weighted binary Moran's I per type
+#' @param coords numeric matrix of X/Y coordinates
+#' @param types character/factor vector of category labels
+#' @param k number of nearest neighbors (excluding self)
+#' @return scalar Moran's I aggregated across categories, or NA
+#' @keywords internal
+.cat_morans_I_knn <- function(coords, types, k) {
+  n <- nrow(coords)
+  if (n < 2L || length(unique(types)) < 2L) return(NA_real_)
+
+  nnI <- RANN::nn2(coords, coords, k = k + 1L)
+  nbr_idx <- nnI$nn.idx[, -1L, drop = FALSE]
+  Wd <- 1 / (nnI$nn.dists[, -1L, drop = FALSE] + .Machine$double.eps)
+  W <- Wd / rowSums(Wd)
+
+  p_tab <- table(types) / n
+  I_acc <- 0
+  w_acc <- 0
+  for (t in names(p_tab)) {
+    z <- as.numeric(types == t)
+    zc <- z - mean(z)
+    denom <- sum(zc^2)
+    if (denom < .Machine$double.eps) next
+    Zlag <- rowSums(W * matrix(zc[nbr_idx], nrow = n))
+    I_acc <- I_acc + as.numeric(p_tab[t]) * sum(zc * Zlag) / denom
+    w_acc <- w_acc + as.numeric(p_tab[t])
+  }
+  if (w_acc == 0) return(NA_real_)
+  I_acc / w_acc
+}
+
 #' Calculate spatial metrics for method selection
 #' @param df data.table with spatial data
 #' @param celltype_col cell type column name
+#' @param x_col optional X coordinate column name (auto-detects X/x)
+#' @param y_col optional Y coordinate column name (auto-detects Y/y)
 #' @return list of spatial metrics
 #' @keywords internal
-.calc_spatial_metrics <- function(df, celltype_col) {
-  coords <- as.matrix(df[, .(X, Y)])
+.calc_spatial_metrics <- function(df, celltype_col = NULL, x_col = NULL, y_col = NULL) {
+  if (!data.table::is.data.table(df)) {
+    df <- data.table::as.data.table(df)
+  }
+  cols <- .resolve_xy_cols(df, x_col, y_col)
+  x_vals <- as.numeric(as.character(df[[cols["x"]]]))
+  y_vals <- as.numeric(as.character(df[[cols["y"]]]))
+  coords <- cbind(x_vals, y_vals)
   n <- nrow(coords)
+  k_nn <- .default_nn_rank()
 
-  nn <- RANN::nn2(coords, coords, k = 2)
-  d1 <- nn$nn.dists[,2]
+  d_knn <- .nn_dist_at_rank(coords, k_nn = k_nn)
+  mean_nn <- mean(d_knn)
+  cv_nn   <- stats::sd(d_knn) / mean_nn
 
-  mean_nn <- mean(d1)
-  cv_nn   <- stats::sd(d1) / mean_nn
+  # Clark-Evans R uses 1-NN distance (theoretical CSR expectation is for 1-NN)
+  d1 <- RANN::nn2(coords, coords, k = 2)$nn.dists[, 2]
 
   # Clark-Evans R index under CSR: E[NN] = 0.5 / sqrt(lambda)
-  rngX <- range(df$X); rngY <- range(df$Y)
+  rngX <- range(x_vals, na.rm = TRUE); rngY <- range(y_vals, na.rm = TRUE)
   area <- (diff(rngX) + 1e-8) * (diff(rngY) + 1e-8)
   lambda <- n / area
   E_nn <- 0.5 / sqrt(lambda)
-  clark_evans_R <- mean_nn / E_nn
+  clark_evans_R <- mean(d1) / E_nn
 
   # Heterogeneity (Gini-Simpson)
   het_gs <- NA_real_
@@ -404,62 +645,75 @@ build_spatial_network <- function(
     het_gs <- 1 - sum((p)^2)
   }
 
-  # Moran's I over encoded types (approx, k= min(20, sqrt(n)))
-  morans_I <- NA_real_
+  # Categorical Moran's I: binary Moran's I per cell type, weighted by type proportion
+  cat_morans_I <- NA_real_
   if (!is.null(celltype_col) && celltype_col %in% names(df)) {
     kI <- max(5, min(20, round(sqrt(n))))
-    nnI <- RANN::nn2(coords, coords, k = kI + 1)
-    z <- as.numeric(factor(df[[celltype_col]]))
-    zc <- z - mean(z)
-    # Compute row-normalized weights and spatial lag via matrix ops
-    Wd <- 1 / (nnI$nn.dists[, -1, drop = FALSE] + .Machine$double.eps)
-    W  <- Wd / rowSums(Wd)
-    Zlag <- rowSums(W * matrix(zc[nnI$nn.idx[, -1, drop = FALSE]], nrow = n))
-    morans_I <- (n / n) * sum(zc * Zlag) / sum(zc^2)
+    cat_morans_I <- .cat_morans_I_knn(coords, df[[celltype_col]], k = kI)
   }
 
   list(
     mean_nn_dist = mean_nn,
+    mean_nn_rank = k_nn,
     cv_nn_dist = cv_nn,
     clark_evans_R = clark_evans_R,
-    morans_I = morans_I,
+    cat_morans_I = cat_morans_I,
     het_gini_simpson = het_gs
   )
 }
 
 #' Select optimal method based on spatial metrics
+#'
+#' Decision tree (when called from `method = "auto"`):
+#' \enumerate{
+#'   \item n > 50000 -> window
+#'   \item cat_morans_I >= 0.4 -> radius (strong type clustering)
+#'   \item cv_nn_dist < 0.3 -> knn (CSR-like)
+#'     or radius (mild deviation from CSR within the same band)
+#'   \item otherwise -> delaunay (fallback)
+#' }
+#'
 #' @param m spatial metrics
 #' @param n number of cells
-#' @return selected method name
+#' @return list with `method` (character) and `params` (list of recommended parameters)
 #' @keywords internal
 .select_method <- function(m, n) {
-  # 1) Very small n -> Delaunay is robust & parameter-free
-  if (n < 300){
-    m$max_edge_length <- m$mean_nn_dist * 2  # Filter long edges
-    return("delaunay")
+  params <- list()
+
+  # 1) Large datasets -> windowed kNN
+  if (n > 50000L) {
+    params$k <- 6L
+    return(list(method = "window", params = params))
   }
 
-  # 2) Highly uneven local density -> kNN (stable degree)
-  if (!is.na(m$cv_nn_dist) && m$cv_nn_dist > 0.7) return("knn")
+  morans <- m$cat_morans_I
 
-  # 3) Strong clustering with moderate density variance -> radius preserves locality
-  if (!is.na(m$morans_I) && m$morans_I > 0.3 ) {
-    m$recommended_radius <- max(50, m$mean_nn_dist * 1.5)  # Default 50μm
-    return("radius")
-  } else if (is.na(m$morans_I)) {
-    warning("Moran's I unavailable, skipping clustering check, defaulting to radius")
+  # 2) Strong spatial clustering of cell types -> radius
+  if (!is.na(morans) && morans >= 0.4) {
+    params$radius <- .default_search_radius(m$mean_nn_dist)
+    return(list(method = "radius", params = params))
   }
 
-  # 4) Huge datasets -> windowed kNN
-  if (n > 5000 && !is.na(m$cv_nn_dist) ) {
-    m$recommended_k <- 6
-    m$tile_size <- 200
-    return("window")
+  if (is.na(morans)) {
+    warning("Categorical Moran's I unavailable; treating as weak clustering (< 0.4).")
   }
 
-  # 5) Default: radius
-  m$recommended_radius <- max(50, m$mean_nn_dist * 1.5)
-  return("radius")
+  # 3) Uniform density + CSR-like layout -> knn or radius
+  cv_ok <- !is.na(m$cv_nn_dist) && m$cv_nn_dist < 0.3
+  ce_r <- m$clark_evans_R
+  ce_ok <- !is.na(ce_r) && ce_r >= 0.85 && ce_r <= 1.15
+
+  if (cv_ok && ce_ok) {
+    if (ce_r >= 0.95 && ce_r <= 1.05) {
+      return(list(method = "knn", params = params))
+    }
+    params$radius <- .default_search_radius(m$mean_nn_dist)
+    return(list(method = "radius", params = params))
+  }
+
+  # 4) Fallback -> Delaunay (parameter-light, robust on irregular layouts)
+  params$max_edge_length <- m$mean_nn_dist * 2
+  list(method = "delaunay", params = params)
 }
 
 #' Build edges using kNN method
@@ -517,9 +771,10 @@ build_spatial_network <- function(
 
 #' Build edges using Delaunay triangulation
 #' @param df data.table with spatial data
+#' @param max_edge_length optional maximum edge length filter
 #' @return data.table with edges
 #' @keywords internal
-.edges_delaunay <- function(df) {
+.edges_delaunay <- function(df, max_edge_length = NULL) {
   if (!requireNamespace("deldir", quietly = TRUE)) {
     warning("Package 'deldir' not installed; falling back to kNN (k=6)")
     return(.edges_knn(df, k = 6))
@@ -534,11 +789,15 @@ build_spatial_network <- function(
   ed_idx <- do.call(rbind, ed_list)
   ed_idx <- unique(t(apply(ed_idx, 1, function(x) sort(x))))
   d <- sqrt((df$X[ed_idx[,1]] - df$X[ed_idx[,2]])^2 + (df$Y[ed_idx[,1]] - df$Y[ed_idx[,2]])^2)
-  data.table::data.table(
+  ed <- data.table::data.table(
     from = df$Cell_ID[ed_idx[,1]],
     to   = df$Cell_ID[ed_idx[,2]],
     dist = d
   )
+  if (!is.null(max_edge_length)) {
+    ed <- ed[dist <= max_edge_length]
+  }
+  ed
 }
 
 #' Build edges using window method
@@ -1989,7 +2248,7 @@ visualize_voronoi <- function(df,
       background_color
     )
 
-    polygons$border_color <- ifelse(polygons$highlight == "Highlighted", "white", NA)
+    polygons$border_color <- ifelse(polygons$highlight == "Highlighted", "white", "grey75")
 
     # Create plot object
     p <- ggplot2::ggplot(polygons, ggplot2::aes(x = x, y = y, group = cell_id)) +

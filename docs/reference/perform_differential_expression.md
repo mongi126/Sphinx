@@ -1,14 +1,12 @@
 # Perform differential expression analysis
 
-Perform differential expression analysis
-
-Plot volcano plots for differential proteins across all clusters
+Compares each neighborhood cluster to all other cells. For
+CLR-normalized protein values, reports mean difference (Target -
+Control) rather than log2 fold change to avoid redundant log transforms.
 
 ## Usage
 
 ``` r
-perform_differential_expression(protein_df)
-
 perform_differential_expression(protein_df)
 ```
 
@@ -18,40 +16,7 @@ perform_differential_expression(protein_df)
 
   Data frame with protein expression and cluster information
 
-- diff_results:
-
-  Differential expression results
-
-- fc_thresh:
-
-  Fold change threshold (default: 0.25)
-
-- p_thresh:
-
-  P-value threshold (default: 0.05)
-
-- cn_cluster:
-
-  Optional vector of clusters to plot (default: NULL = all)
-
-- y_max:
-
-  Optional maximum for y-axis (logP) (default: NULL = auto)
-
-- save_plot:
-
-  Whether to save the plot (default: FALSE)
-
-- output_dir:
-
-  Output directory for saving (default: "plots")
-
-- filename:
-
-  Output filename (default: "volcano_plots")
-
 ## Value
 
-Data frame with differential expression results
-
-ggplot object
+Data frame with columns Mean_Target, Mean_Control, MeanDiff, p.value,
+adj.p.value, and Significance

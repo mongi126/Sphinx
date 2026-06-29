@@ -4,12 +4,16 @@
 \alias{.calc_spatial_metrics}
 \title{Calculate spatial metrics for method selection}
 \usage{
-.calc_spatial_metrics(df, celltype_col)
+.calc_spatial_metrics(df, celltype_col = NULL, x_col = NULL, y_col = NULL)
 }
 \arguments{
 \item{df}{data.table with spatial data}
 
 \item{celltype_col}{cell type column name}
+
+\item{x_col}{optional X coordinate column name (auto-detects X/x)}
+
+\item{y_col}{optional Y coordinate column name (auto-detects Y/y)}
 }
 \value{
 list of spatial metrics

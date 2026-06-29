@@ -2,25 +2,25 @@
 
 ### Get started
 
-- [Workflow](https://github.com/mongi126/Sphinx/articles/workflow.md):
-- [Installation](https://github.com/mongi126/Sphinx/articles/installation.md):
+- [Workflow](https://mongi126.github.io/Sphinx/articles/workflow.md):
+- [Installation](https://mongi126.github.io/Sphinx/articles/installation.md):
 
 ### Data Preprocessing
 
 - [Data
-  Preprocessing](https://github.com/mongi126/Sphinx/articles/preprocessing.md):
+  Preprocessing](https://mongi126.github.io/Sphinx/articles/preprocessing.md):
 
 ### Cell Annotation
 
 - [Cell
-  Annotation](https://github.com/mongi126/Sphinx/articles/annotation.md):
+  Annotation](https://mongi126.github.io/Sphinx/articles/annotation.md):
 
 ### Spatial Network Analysis
 
 - [Spatial Network
-  Analysis](https://github.com/mongi126/Sphinx/articles/spatial-network.md):
+  Analysis](https://mongi126.github.io/Sphinx/articles/spatial-network.md):
 
 ### Functional Analysis
 
 - [Functional
-  Analysis](https://github.com/mongi126/Sphinx/articles/functional.md):
+  Analysis](https://mongi126.github.io/Sphinx/articles/functional.md):

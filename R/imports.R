@@ -22,7 +22,10 @@
 #' @importFrom utils write.csv head tail str
 #' @importFrom grDevices colorRampPalette dev.off pdf
 #' @importFrom stats dist hclust kmeans prcomp complete.cases quantile
-#' @importFrom stats sd var p.adjust t.test median mad
+#' @importFrom stats sd var p.adjust t.test median mad setNames na.omit reorder
+#' @importFrom utils installed.packages read.csv
+#' @importFrom ggplot2 theme_bw element_line margin scale_fill_viridis_c scale_color_viridis_c
+#' @importFrom viridis scale_fill_viridis scale_color_viridis viridis
 #' @importFrom methods as is new
 #' @importFrom scattermore geom_scattermore
 #' @importFrom progress progress_bar
@@ -34,7 +37,6 @@
 #' @importFrom tidyr pivot_wider
 #' @importFrom stringr str_replace str_trunc
 #' @importFrom scales hue_pal percent_format rescale
-#' @importFrom viridis scale_fill_viridis scale_color_viridis viridis
 #' @importFrom deldir deldir tile.list triang.list
 
 NULL

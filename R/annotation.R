@@ -1,13 +1,5 @@
 # R/annotation.R
 
-#' @importFrom stats na.omit setNames
-#' @importFrom utils write.csv head
-#' @importFrom grDevices colorRampPalette
-#' @importFrom RColorBrewer brewer.pal
-#' @importFrom pheatmap pheatmap
-#' @importFrom patchwork wrap_plots plot_annotation
-NULL
-
 #' Custom color palette for cell type visualizations
 #'
 #' A predefined vector of 36 distinct colors for consistent cell type coloring
@@ -261,7 +253,7 @@ annotate_celltypes <- function(seurat_obj,
   }
 
   # Create mapping vector
-  cluster_mapping <- stats::setNames(celltype_labels, cluster_ids)
+  cluster_mapping <- setNames(celltype_labels, cluster_ids)
 
   # Apply mapping to create celltype annotations
   current_clusters <- as.character(seurat_obj@meta.data[[cluster_column]])
@@ -270,7 +262,7 @@ annotate_celltypes <- function(seurat_obj,
   # Report annotation statistics
   annotated_cells <- sum(!is.na(seurat_obj@meta.data$celltype))
   message("Cell types annotated: ",
-          length(unique(stats::na.omit(seurat_obj@meta.data$celltype))))
+          length(unique(na.omit(seurat_obj@meta.data$celltype))))
   message("Annotated cells: ", annotated_cells, "/", ncol(seurat_obj))
 
   return(seurat_obj)
@@ -544,7 +536,7 @@ plot_umap_markers <- function(seurat_obj,
   }
 
   # ---- Determine assay ----
-  if (is.null(assay)) assay <- Seurat::DefaultAssay(seurat_obj)
+  if (is.null(assay)) assay <- DefaultAssay(seurat_obj)
   if (!assay %in% names(seurat_obj@assays)) {
     stop("Assay '", assay, "' not found in Seurat object.")
   }
@@ -565,7 +557,7 @@ plot_umap_markers <- function(seurat_obj,
   if (length(markers) == 0) stop("No valid markers found for visualization.")
 
   # ---- Ensure marker expression is numeric ----
-  expr_mat <- Seurat::GetAssayData(seurat_obj, assay = assay, slot = "data")
+  expr_mat <- GetAssayData(seurat_obj, assay = assay, slot = "data")
   expr_mat <- as.matrix(expr_mat)
   storage.mode(expr_mat) <- "numeric"
 

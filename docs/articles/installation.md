@@ -3,6 +3,7 @@
 ## From GitHub
 
 ``` r
+
 # Install development version from GitHub
 devtools::install_github("mongi126/Sphinx")
 library(Sphinx)

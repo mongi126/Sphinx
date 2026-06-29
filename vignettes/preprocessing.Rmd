@@ -1,4 +1,4 @@
----
+﻿---
 title: "Data Preprocessing"
 output: rmarkdown::html_vignette
 vignette: >
@@ -69,7 +69,6 @@ print(obj_processed)
 plot_elbow(obj_processed, "elbow_plot.png")
 ```
 
-![](elbow_plot.png){width=700px}
 
 *Elbow plot showing explained variance by PCA components. The "elbow" indicates optimal number of dimensions.*
 
@@ -92,7 +91,6 @@ plots <- visualize_results(obj_processed, save_dir = "./results/")
 
 ### Cluster UMAP Visualization
 
-![](codex_umap.jpg){width=700px}
 
 *UMAP visualization showing cell clusters in reduced dimensional space.*
 

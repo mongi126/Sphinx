@@ -11,7 +11,7 @@ perform_cluster_enrichment(
   protein_databases = NULL,
   custom_databases = NULL,
   pvalueCutoff = 0.05,
-  log2FC_cutoff = 0,
+  mean_diff_cutoff = 0,
   use_adj_pvalue = TRUE
 )
 }
@@ -28,7 +28,7 @@ perform_cluster_enrichment(
 
 \item{pvalueCutoff}{Significance cutoff (default: 0.05)}
 
-\item{log2FC_cutoff}{Minimum log2 fold change (default: 0)}
+\item{mean_diff_cutoff}{Minimum mean difference, Target - Control (default: 0)}
 
 \item{use_adj_pvalue}{Whether to use adjusted p-values (default: TRUE)}
 }

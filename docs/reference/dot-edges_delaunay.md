@@ -5,7 +5,7 @@ Build edges using Delaunay triangulation
 ## Usage
 
 ``` r
-.edges_delaunay(df)
+.edges_delaunay(df, max_edge_length = NULL)
 ```
 
 ## Arguments
@@ -13,6 +13,10 @@ Build edges using Delaunay triangulation
 - df:
 
   data.table with spatial data
+
+- max_edge_length:
+
+  optional maximum edge length filter
 
 ## Value
 

@@ -7,9 +7,10 @@
 calculate_optimal_radius(
   df,
   sample_size = 1000,
-  multiplier = 1.5,
+  multiplier = 2,
   x_col = "X",
-  y_col = "Y"
+  y_col = "Y",
+  k_nn = 10L
 )
 }
 \arguments{
@@ -17,11 +18,13 @@ calculate_optimal_radius(
 
 \item{sample_size}{Maximum cells to sample for efficiency (default: 1000)}
 
-\item{multiplier}{Factor for recommended radius (default: 1.5)}
+\item{multiplier}{Factor for recommended radius (default: 2.0)}
 
 \item{x_col}{Column name for X coordinates (default: "X")}
 
 \item{y_col}{Column name for Y coordinates (default: "Y")}
+
+\item{k_nn}{Nearest-neighbor rank used for distance summary (default: 10)}
 }
 \value{
 List with distance statistics and recommended parameters

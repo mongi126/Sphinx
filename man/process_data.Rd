@@ -38,27 +38,3 @@ Performs comprehensive data processing pipeline:
 \item UMAP visualization
 }
 }
-\examples{
-if(interactive()){
-# Load and filter data
-obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-obj_filtered <- filter_data(obj)
-
-# Process with default parameters
-obj_processed <- process_data(obj_filtered)
-
-# Process with custom parameters for higher resolution
-obj_processed <- process_data(
-  obj_filtered,
-  dims = 1:15,
-  resolution = 0.8
-)
-
-# Process with different normalization
-obj_processed <- process_data(
-  obj_filtered,
-  normalization.method = "LogNormalize",
-  margin = 1
-)
-}
-}

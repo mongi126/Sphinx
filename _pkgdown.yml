@@ -1,0 +1,166 @@
+url: https://mongi126.github.io/Sphinx/
+title: "Sphinx: Spatial Proteomics Analysis Toolkit"
+
+template:
+  bootstrap: 5
+  bslib:
+    primary: "#2E8B57"
+    base_font:
+      google: "Lato"
+    heading_font:
+      google: "Roboto Condensed"
+
+navbar:
+  components:
+    home:
+      text: "Get started"
+      menu:
+        - text: "Workflow"
+          href: articles/workflow.html
+        - text: "Installation"
+          href: articles/installation.html
+    tutorials:
+      text: "Tutorials"
+      menu:
+        - text: "Data Preprocessing"
+          href: articles/preprocessing.html
+        - text: "Cell Annotation"
+          href: articles/annotation.html
+        - text: "Spatial Network Analysis"
+          href: articles/spatial-network.html
+        - text: "Functional Analysis"
+          href: articles/functional.html
+    functions:
+      text: "Functions"
+      href: reference/index.html
+    github:
+      icon: fab fa-github
+      href: https://github.com/mongi126/Sphinx
+      aria-label: GitHub
+
+  structure:
+    left: [home, tutorials, functions]
+    right: [github]
+
+home:
+  strip_header: false
+  structure:
+    right: []
+
+reference:
+  - title: "Data Preprocessing"
+    contents:
+      - spatial_colors
+      - load_spatial_data
+      - filter_data
+      - process_data
+      - plot_elbow
+      - extract_spatial_coordinates
+      - visualize_results
+
+  - title: "Cell Annotation"
+    contents:
+      - celltype_colors
+      - find_top_markers
+      - plot_marker_violin
+      - plot_marker_heatmap
+      - annotate_celltypes
+      - plot_annotated_umap
+      - plot_spatial_distribution
+      - plot_spatial_markers
+      - plot_umap_markers
+
+  - title: "Spatial Network Analysis"
+    contents:
+      - prepare_data
+      - calculate_optimal_radius
+      - calculate_optimal_window_size
+      - calculate_celltype_distances
+      - visualize_distance_heatmap
+      - visualize_distance_parallel
+      - build_spatial_network
+      - calculate_neighborhood_features
+      - cluster_neighborhoods
+      - visualize_spatial_distribution
+      - calculate_cluster_composition
+      - plot_composition_barplot
+      - plot_composition_heatmap
+      - calculate_neighborhood_purity
+      - visualize_neighborhood_purity
+      - analyze_spatial_interactions
+      - visualize_interaction_heatmap
+      - visualize_interaction_network
+      - visualize_spatial_network
+      - visualize_voronoi
+      - get_color_palette
+
+  - title: "Functional Analysis"
+    contents:
+      - prepare_protein_data
+      - perform_differential_expression
+      - plot_volcano_all_clusters
+      - perform_cluster_enrichment
+      - plot_enrichment_results
+
+articles:
+  - title: "Get started"
+    contents:
+      - "workflow"
+      - "installation"
+
+  - title: "Data Preprocessing"
+    contents:
+      - "preprocessing"
+
+  - title: "Cell Annotation"
+    contents:
+      - "annotation"
+
+  - title: "Spatial Network Analysis"
+    contents:
+      - "spatial-network"
+
+  - title: "Functional Analysis"
+    contents:
+      - "functional"
+
+news:
+  - title: "Sphinx v1.0.0 released"
+    date: "2025-09-24"
+    contents: |
+      Initial release of Sphinx with complete spatial proteomics analysis workflow.
+
+development:
+  mode: auto
+  version: "1.0.0"
+  package: "Sphinx"
+
+authors:
+  yourname:
+    name: "Mengyi Yan"
+    roles: [aut, cre]
+
+footer:
+  left:
+    - text: "MIT License"
+    - href: LICENSE.md
+  right:
+    - icon: "fab fa-github"
+      href: "https://github.com/mongi126/Sphinx"
+    - icon: "fas fa-bug"
+      href: "https://github.com/mongi126/Sphinx/issues"
+
+meta:
+  description: "Sphinx - Spatial Proteomics Analysis Toolkit for R"
+  og:
+    image: "https://mongi126.github.io/Sphinx/logo.png"
+  twitter:
+    card: summary
+    site: "@mongi126"
+    creator: "@mongi126"
+
+output:
+  html_document:
+    self_contained: no
+    lib_dir: site_libs
+    keep_md: yes

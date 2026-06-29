@@ -1,15 +1,5 @@
 # R/preprocessing.R
 
-#' @importFrom utils head installed.packages read.csv
-#' @importFrom stats median mad quantile
-#' @importFrom Seurat CreateSeuratObject DefaultAssay NormalizeData
-#'   SetAssayData GetAssayData VariableFeatures ScaleData RunPCA
-#'   FindNeighbors FindClusters RunUMAP DimPlot ElbowPlot Embeddings
-#'   CreateDimReducObject
-#' @importFrom ggplot2 ggplot aes geom_point theme_classic scale_color_manual
-#'   coord_fixed labs element_text ggsave ggtitle
-NULL
-
 #' Custom color palette for visualizations
 #'
 #' A predefined vector of 36 distinct colors for consistent plotting
@@ -39,24 +29,6 @@ spatial_colors <- c(
 #' 1. An existing Seurat object (RDS file)
 #' 2. Counts and coordinates CSV files
 #' 3. Akoya platform data files
-#'
-#' @examples
-#' if(interactive()){
-#' # Load from RDS file
-#' obj <- load_spatial_data(filename = "spatial_data.rds")
-#'
-#' # Load from separate counts and coordinates CSV files
-#' obj <- load_spatial_data(
-#'   counts_file = "expression_matrix.csv",
-#'   coords_file = "cell_coordinates.csv"
-#' )
-#'
-#' # Load Akoya data
-#' obj <- load_spatial_data(
-#'   filename = "akoya_output.csv",
-#'   type = "akoya"
-#' )
-#' }
 load_spatial_data <- function(filename = NULL,
                               counts_file = NULL,
                               coords_file = NULL,
@@ -96,7 +68,7 @@ load_spatial_data <- function(filename = NULL,
   if (type == "akoya") {
     if (is.null(filename) || !file.exists(filename))
       stop("Akoya csv file not found.")
-    obj <- Seurat::LoadAkoya(filename = filename,
+    obj <- LoadAkoya(filename = filename,
                                 type = akoya_type,
                                 fov = fov)
     message("Loaded Akoya data into Seurat object. Cell count: ", ncol(obj))
@@ -164,22 +136,6 @@ load_spatial_data <- function(filename = NULL,
 #' Performs two-step quality control filtering:
 #' 1. Removes cells with outlier total counts (MAD-based)
 #' 2. Removes cells with low detected feature counts (quantile-based)
-#'
-#' @examples
-#' if(interactive()){
-#' # Load or create a Seurat object first
-#' obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-#'
-#' # Filter with default parameters
-#' obj_filtered <- filter_data(obj)
-#'
-#' # Filter with custom thresholds
-#' obj_filtered <- filter_data(
-#'   obj,
-#'   nCount_mad_threshold = 2.5,
-#'   nFeature_quantile_threshold = 0.03
-#' )
-#' }
 filter_data <- function(obj,
                         nCount_mad_threshold = 3,
                         nFeature_quantile_threshold = 0.05) {
@@ -249,30 +205,6 @@ filter_data <- function(obj,
 #' 5. Nearest-neighbor graph construction
 #' 6. Cluster identification
 #' 7. UMAP visualization
-#'
-#' @examples
-#' if(interactive()){
-#' # Load and filter data
-#' obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-#' obj_filtered <- filter_data(obj)
-#'
-#' # Process with default parameters
-#' obj_processed <- process_data(obj_filtered)
-#'
-#' # Process with custom parameters for higher resolution
-#' obj_processed <- process_data(
-#'   obj_filtered,
-#'   dims = 1:15,
-#'   resolution = 0.8
-#' )
-#'
-#' # Process with different normalization
-#' obj_processed <- process_data(
-#'   obj_filtered,
-#'   normalization.method = "LogNormalize",
-#'   margin = 1
-#' )
-#' }
 process_data <- function(obj,
                          normalization.method = "CLR",
                          margin = 2,
@@ -281,6 +213,29 @@ process_data <- function(obj,
 
   # Determine assay name
   assay_name <- Seurat::DefaultAssay(obj)
+
+# Fix meta.features if they don't match data features
+  assay_obj <- obj[[assay_name]]
+  
+  if (inherits(assay_obj, "Assay5")) {
+    # Seurat v5
+    if (!identical(rownames(assay_obj@meta.data), rownames(obj))) {
+      message("Fixing meta.data to match data features...")
+      obj[[assay_name]]@meta.data <- data.frame(
+        row.names = rownames(obj),
+        name = rownames(obj)
+      )
+    }
+  } else {
+    # Seurat v4 
+    if (!identical(rownames(assay_obj@meta.features), rownames(obj))) {
+      message("Fixing meta.features to match data features...")
+      obj[[assay_name]]@meta.features <- data.frame(
+        row.names = rownames(obj),
+        name = rownames(obj)
+      )
+    }
+  }
 
   # Data normalization - CLR recommended for protein data
   tryCatch({
@@ -339,7 +294,7 @@ process_data <- function(obj,
 
   # Cell clustering workflow
   obj <- Seurat::FindNeighbors(obj, dims = dims)    # Build kNN graph
-  obj <- Seurat::FindClusters(obj, resolution = resolution)  # Identify clusters
+  obj <- Seurat::FindClusters(obj, resolution = resolution, algorithm = 4)  # Identify clusters
 
   # Non-linear dimensionality reduction for visualization
   obj <- Seurat::RunUMAP(obj, dims = dims)
@@ -358,20 +313,6 @@ process_data <- function(obj,
 #' @description
 #' Creates elbow plot to determine optimal number of PCA dimensions.
 #' Saves plot to specified path and returns ggplot object.
-#'
-#' @examples
-#' if(interactive()){
-#' # Load and process data
-#' obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-#' obj_filtered <- filter_data(obj)
-#' obj_processed <- process_data(obj_filtered)
-#'
-#' # Generate elbow plot with default path
-#' elbow_plot <- plot_elbow(obj_processed)
-#'
-#' # Generate elbow plot with custom path
-#' elbow_plot <- plot_elbow(obj_processed, save_path = "results/elbow_plot.pdf")
-#' }
 plot_elbow <- function(obj, save_path = "elbow_plot.pdf") {
   # Generate elbow plot of PCA standard deviations
   p <- Seurat::ElbowPlot(obj)
@@ -392,18 +333,6 @@ plot_elbow <- function(obj, save_path = "elbow_plot.pdf") {
 #' @description
 #' Extracts spatial coordinates from reduction slot and adds them to object metadata.
 #' Verifies successful extraction by printing coordinate sample.
-#'
-#' @examples
-#' if(interactive()){
-#' # Load data (coordinates automatically added for CSV input)
-#' obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-#'
-#' # Extract coordinates (if not already in metadata)
-#' obj <- extract_spatial_coordinates(obj)
-#'
-#' # Now coordinates are available in metadata for plotting
-#' head(obj@meta.data[, c("X", "Y")])
-#' }
 extract_spatial_coordinates <- function(obj) {
   # Check if spatial reduction exists
   if ("spatial" %in% names(obj@reductions)) {
@@ -452,29 +381,6 @@ extract_spatial_coordinates <- function(obj) {
 #' Generates and saves two key visualizations:
 #' 1. UMAP projection showing cell clusters
 #' 2. Spatial scatter plot showing cluster distribution in tissue context
-#'
-#' @examples
-#' if(interactive()){
-#' # Complete analysis workflow
-#' # Step 1: Load data
-#' obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
-#'
-#' # Step 2: Filter low-quality cells
-#' obj_filtered <- filter_data(obj)
-#'
-#' # Step 3: Process data (normalization, PCA, clustering)
-#' obj_processed <- process_data(obj_filtered)
-#'
-#' # Step 4: Extract coordinates if needed
-#' obj_processed <- extract_spatial_coordinates(obj_processed)
-#'
-#' # Step 5: Visualize results
-#' plots <- visualize_results(obj_processed, save_dir = "results/")
-#'
-#' # Access individual plots
-#' print(plots$umap_plot)
-#' print(plots$spatial_plot)
-#' }
 visualize_results <- function(obj, save_dir = "./") {
 
   # Check if seurat_clusters exists

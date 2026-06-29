@@ -1,4 +1,4 @@
----
+﻿---
 title: "Functional Analysis"
 output: rmarkdown::html_vignette
 vignette: >
@@ -75,7 +75,6 @@ volcano_all <- volcano_all + theme(aspect.ratio = 0.75)
 ggsave("VolcanoPlots_AllClusters.pdf", volcano_all, width = 10, height = 20)
 ```
 
-![](VolcanoPlots_AllClusters.png){width=700px}
 
 ## 5. Functional Enrichment Analysis
 
@@ -123,8 +122,6 @@ dot_plot <- plots$dot_plot
 
 ### Enrichment Bar Plot
 
-![](bar_plot.jpg){width=700px}
 
 ### Enrichment bubble plot
 
-![](bubble_plot.jpg){width=700px}

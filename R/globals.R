@@ -9,5 +9,5 @@ utils::globalVariables(c(
   "seurat_clusters", "plot_celltype", "to_x", "from_x",
   "to_y", "from_y", "x", "y", "cell_id", "fill_color",
   "highlight", "border_color", "color_group", "celltype",
-  "logP", "Significance", "LoadAkoya"
+  "logP", "Significance", "LoadAkoya", "MeanDiff"
 ))

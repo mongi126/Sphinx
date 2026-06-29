@@ -1,4 +1,4 @@
----
+﻿---
 title: "Cell Annotation"
 output: rmarkdown::html_vignette
 vignette: >
@@ -57,7 +57,6 @@ plot_marker_violin(
 )
 ```
 
-![](allmarker.jpg){width=700px}
 
 *Violin plots showing expression distribution of marker proteins across clusters.*
 
@@ -72,7 +71,6 @@ plot_marker_heatmap(
 )
 ```
 
-![](marker_heatmap.png){width=700px}
 
 *Heatmap plots showing expression of marker proteins across clusters.*
 
@@ -84,7 +82,6 @@ plot_umap_markers(codex.obj,
                               "a-SMA","CD8","CD4"))
 ```
 
-![](umap_markers_plot.png){width=700px}
 
 *Heatmap plots showing expression of marker proteins across clusters.*
 
@@ -97,7 +94,6 @@ plot_spatial_markers(codex.obj,
                   point_size = 0.5)
 ```
 
-![](spatial_markers.png){width=700px}
 
 *Heatmap plots showing spatial distribution of marker proteins across clusters.*
 
@@ -105,8 +101,7 @@ plot_spatial_markers(codex.obj,
 
 ```{r annotate_celltypes, eval=FALSE}
 # Define cluster to cell type mapping
-cluster_ids <- c(0, 1, 2, 3, 4, 5, 6, 7，8，
-                 9，10，11，12，13，14，15)
+cluster_ids <- c(0, 1, 2, 3, 4, 5, 6, 7锛?锛?                 9锛?0锛?1锛?2锛?3锛?4锛?5)
 celltype_labels <- c(
   "Endothelial", "Tumor", "DC", "M2_Macrophage","Tumor","CAF","PD-1_CD4_T","B","Endothelial",
   "GC_B", "DC", "EMT_like_Tumor", "Proliferating_DC","Endothelial","Endothelial","Proliferating_Tumor"
@@ -136,7 +131,6 @@ plot_annotated_umap(
 )
 ```
 
-![](umap_by_celltype.jpg){width=700px}
 
 *UMAP visualization colored by annotated cell types.*
 
@@ -150,7 +144,6 @@ plot_spatial_distribution(
 )
 ```
 
-![](celltype_spatial_plot.png){width=700px}
 
 *Spatial distribution of annotated cell types across tissue coordinates.*
 

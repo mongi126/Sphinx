@@ -1,4 +1,4 @@
----
+﻿---
 title: "Spatial Network Analysis"
 output: rmarkdown::html_vignette
 vignette: >
@@ -43,7 +43,6 @@ visualize_spatial_distribution(
 )
 ```
 
-![](01_spatial_distribution_celltype.jpg){width=700px}
 
 *Visualize spatial cell type distribution*
 
@@ -59,7 +58,6 @@ dist_result <- calculate_celltype_distances(df, celltype_col = "celltype")
 visualize_distance_heatmap(dist_result)
 ```
 
-![](02_distance_heatmap.jpg){width=700px}
 
 ```{r distance-heatmap, eval=FALSE}
 visualize_distance_parallel(dist_result)
@@ -115,7 +113,6 @@ visualize_spatial_distribution(
 )
 ```
 
-![](05_spatial_distribution_clusters.jpg){width=700px}
 
 ### Cluster Composition
 
@@ -136,7 +133,6 @@ plot_composition_barplot(
 )
 ```
 
-![](07_cluster_composition_barplot.jpg){width=700px}
 
 ### Voronoi Diagram
 
@@ -149,7 +145,6 @@ visualize_voronoi(
 )
 ```
 
-![](12_voronoi_neighborhood.png){width=700px}
 
 ## 6.Spatial Interaction Analysis
 
@@ -171,7 +166,6 @@ visualize_interaction_heatmap(
 )
 ```
 
-![](08_interaction_heatmap.jpg){width=700px}
 
 ### Spatial Network Visualization
 
@@ -192,7 +186,6 @@ visualize_spatial_network(
 )
 ```
 
-![](10_spatial_network.jpg){width=700px}
 
 ### Interaction Network Graph
 
@@ -207,7 +200,6 @@ visualize_interaction_network(
 )
 ```
 
-![](11_cell_interaction_network.jpg){width=700px}
 
 ## 7.Neighborhood Purity Analysis
 
@@ -240,4 +232,3 @@ visualize_neighborhood_purity(
   )
 ```
 
-![](04_neighborhood_purity.jpg){width=700px}

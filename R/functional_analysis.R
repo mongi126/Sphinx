@@ -1,11 +1,5 @@
 # R/functional_analysis.R
 
-#' @importFrom stats na.omit reorder setNames
-#' @importFrom utils installed.packages
-#' @importFrom ggplot2 theme_bw element_line margin
-#' @importFrom scales hue_pal
-NULL
-
 #' Prepare protein expression data for functional analysis
 #'
 #' @param cluster_df Data frame with neighborhood cluster assignments and spatial coordinates
@@ -43,8 +37,13 @@ prepare_protein_data <- function(cluster_df, expr_df) {
 
 #' Perform differential expression analysis
 #'
+#' Compares each neighborhood cluster to all other cells. For CLR-normalized
+#' protein values, reports mean difference (Target - Control) rather than
+#' log2 fold change to avoid redundant log transforms.
+#'
 #' @param protein_df Data frame with protein expression and cluster information
-#' @return Data frame with differential expression results
+#' @return Data frame with columns Mean_Target, Mean_Control, MeanDiff, p.value,
+#'   adj.p.value, and Significance
 #' @export
 perform_differential_expression <- function(protein_df) {
   meta_cols <- c("Cell_ID", "X", "Y", "Neighborhood_Cluster", "Spatial_Zone")
@@ -54,7 +53,6 @@ perform_differential_expression <- function(protein_df) {
   results <- list()
 
   for (cluster in clusters) {
-    # cluster vs rest
     protein_df$In_Cluster <- ifelse(
       protein_df$Neighborhood_Cluster == cluster,
       "Target",
@@ -70,12 +68,14 @@ perform_differential_expression <- function(protein_df) {
       }
 
       test_res <- t.test(target, control)
+      mean_target <- mean(target, na.rm = TRUE)
+      mean_control <- mean(control, na.rm = TRUE)
       data.frame(
         Protein = prot,
         Cluster = cluster,
-        Mean_Target = mean(target, na.rm = TRUE),
-        Mean_Control = mean(control, na.rm = TRUE),
-        Log2FC = log2(mean(target, na.rm = TRUE) / mean(control, na.rm = TRUE)),
+        Mean_Target = mean_target,
+        Mean_Control = mean_control,
+        MeanDiff = mean_target - mean_control,
         p.value = test_res$p.value
       )
     })
@@ -85,7 +85,7 @@ perform_differential_expression <- function(protein_df) {
       cluster_df$adj.p.value <- p.adjust(cluster_df$p.value, method = "BH")
       cluster_df$Significance <- ifelse(
         cluster_df$adj.p.value < 0.05,
-        ifelse(cluster_df$Log2FC > 0, "Up", "Down"),
+        ifelse(cluster_df$MeanDiff > 0, "Up", "Down"),
         "NS"
       )
       results[[as.character(cluster)]] <- cluster_df
@@ -97,121 +97,72 @@ perform_differential_expression <- function(protein_df) {
   return(final_result)
 }
 
-#' Plot volcano plots for differential proteins across clusters
+#' Plot volcano plots for differential proteins across all clusters
 #'
-#' @param diff_results Differential expression results (from perform_differential_expression)
-#' @param fc_thresh Fold change threshold on Log2FC (default: 0.25)
-#' @param p_thresh Adjusted p-value threshold (default: 0.05)
-#' @param cn_cluster Optional vector of clusters to plot (default: NULL = all)
-#' @param y_max Optional maximum for y-axis (logP) (default: NULL = auto)
-#' @param cap_p P-value cap for extreme values (default: 1e-50)
-#' @param cap_jitter Jitter amount for capped points (default: 0.15, not used in current implementation)
+#' @param diff_results Differential expression results
+#' @param diff_thresh Mean difference threshold, Target - Control (default: 0.25)
+#' @param p_thresh P-value threshold (default: 0.05)
 #' @param save_plot Whether to save the plot (default: FALSE)
 #' @param output_dir Output directory for saving (default: "plots")
 #' @param filename Output filename (default: "volcano_plots")
 #' @return ggplot object
 #' @export
-plot_volcano_cn_clusters <- function(diff_results,
-                                     fc_thresh = 0.25,
-                                     p_thresh = 0.05,
-                                     cn_cluster = NULL,
-                                     y_max = NULL,
-                                     cap_p = 1e-50,
-                                     cap_jitter = 0.15,
-                                     save_plot = FALSE,
-                                     output_dir = "plots",
-                                     filename = "volcano_plots") {
-  if (!requireNamespace("ggplot2", quietly = TRUE)) stop("Please install ggplot2 package")
-  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Please install dplyr package")
-  if (!requireNamespace("ggrepel", quietly = TRUE)) stop("Please install ggrepel package")
-  df <- diff_results
-  # Basic column checks
-  need_cols <- c("Protein", "Cluster", "Log2FC")
-  miss0 <- setdiff(need_cols, colnames(df))
-  if (length(miss0) > 0) stop("diff_results is missing columns: ", paste(miss0, collapse = ", "))
-  # Allow providing only p.value: automatically compute adj.p.value (BH within each Cluster)
-  if (!("adj.p.value" %in% colnames(df))) {
-    if (!("p.value" %in% colnames(df))) {
-      stop("diff_results is missing p.value/adj.p.value; cannot plot a volcano plot. Please re-compute using perform_differential_expression.")
-    }
-    df <- df %>%
-      dplyr::group_by(Cluster) %>%
-      dplyr::mutate(adj.p.value = p.adjust(p.value, method = "BH")) %>%
-      dplyr::ungroup()
+plot_volcano_all_clusters <- function(diff_results, diff_thresh = 0.25, p_thresh = 0.05,
+                                      save_plot = FALSE, output_dir = "plots",
+                                      filename = "volcano_plots") {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Please install ggplot2 package")
   }
-  if (!is.null(cn_cluster)) {
-    df <- df[df$Cluster %in% cn_cluster, , drop = FALSE]
-    if (nrow(df) == 0) {
-      stop(
-        "No data remains after filtering by cn_cluster. You passed: ",
-        paste(cn_cluster, collapse = ", "),
-        "\nAvailable clusters include: ",
-        paste(sort(unique(diff_results$Cluster)), collapse = ", ")
-      )
-    }
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Please install dplyr package")
   }
-  cap_logP <- -log10(cap_p)
-  df$adj.p.value <- pmax(df$adj.p.value, cap_p)
-  df$logP_raw <- -log10(df$adj.p.value)
-  df$capped <- df$logP_raw >= cap_logP - 1e-12
-  df$logP <- pmin(df$logP_raw, cap_logP)
-  df <- df %>%
+  if (!requireNamespace("ggrepel", quietly = TRUE)) {
+    stop("Please install ggrepel package")
+  }
+
+  df <- diff_results %>%
     dplyr::mutate(Significance = dplyr::case_when(
-      adj.p.value < p_thresh & Log2FC >=  fc_thresh ~ "Up",
-      adj.p.value < p_thresh & Log2FC <= -fc_thresh ~ "Down",
+      adj.p.value < p_thresh & MeanDiff >= diff_thresh ~ "Up",
+      adj.p.value < p_thresh & MeanDiff <= -diff_thresh ~ "Down",
       TRUE ~ "NS"
     ))
-  df <- df[!(df$capped & df$Significance == "Down"), , drop = FALSE]
-  label_df <- df %>% dplyr::filter(Significance %in% c("Up", "Down"))
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = Log2FC, y = logP)) +
-  ggplot2::geom_point(ggplot2::aes(color = Significance), alpha = 0.8, size = 2) +
-  ggplot2::geom_point(
-    data = df[df$capped & df$Significance == "Up", , drop = FALSE],
-    ggplot2::aes(x = Log2FC, y = logP),
-    shape = 24, fill = "firebrick", color = "black", stroke = 0.2, size = 2.6,
-    show.legend = FALSE
-  ) +
-  ggplot2::scale_color_manual(values = c("Up" = "firebrick", "Down" = "steelblue", "NS" = "grey70")) +
-  ggplot2::geom_vline(xintercept = c(-fc_thresh, fc_thresh), linetype = "dashed", color = "black") +
-  ggplot2::geom_hline(yintercept = -log10(p_thresh), linetype = "dotted", color = "black") +
-  ggplot2::geom_hline(yintercept = cap_logP, linetype = "solid", color = "grey40", linewidth = 0.3) +
-  ggrepel::geom_text_repel(
-    data = label_df,
-    ggplot2::aes(label = Protein),
-    size = 3,
-    max.overlaps = 100,
-    box.padding = 0.5,
-    point.padding = 0.3,
-    segment.color = "grey50"
-  ) +
-  ggplot2::labs(
-    title = if (is.null(cn_cluster)) {
-      "Volcano Plots of Differential Proteins by Neighborhood Cluster"
-    } else {
-      paste0("Volcano Plot (Cluster: ", paste(unique(df$Cluster), collapse = ", "), ")")
-    },
-    x = "log2(Fold Change)",
-    y = "-log10(Adjusted p-value)",
-    color = "Significance"
-  ) +
-  ggplot2::theme_bw(base_size = 12) +
-  ggplot2::theme(strip.text = ggplot2::element_text(face = "bold"),
-                 legend.position = "right")
-  # Facet only when plotting multiple clusters; otherwise keep a single panel.
-  if (length(unique(df$Cluster)) > 1) {
-    p <- p + ggplot2::facet_wrap(~ Cluster, scales = "free_y", ncol = 3)
-  }
-  # Limit for y-axis
-  if (!is.null(y_max)) {
-    p <- p + ggplot2::coord_cartesian(ylim = c(0, y_max))
-  }
+
+  label_df <- df %>%
+    dplyr::filter(Significance %in% c("Up", "Down"))
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = MeanDiff, y = -log10(adj.p.value))) +
+    ggplot2::geom_point(ggplot2::aes(color = Significance), alpha = 0.8, size = 2) +
+    ggplot2::scale_color_manual(values = c("Up" = "firebrick", "Down" = "steelblue", "NS" = "grey70")) +
+    ggplot2::geom_vline(xintercept = c(-diff_thresh, diff_thresh), linetype = "dashed", color = "black") +
+    ggplot2::geom_hline(yintercept = -log10(p_thresh), linetype = "dotted", color = "black") +
+    ggrepel::geom_text_repel(
+      data = label_df,
+      ggplot2::aes(label = Protein),
+      size = 3,
+      max.overlaps = 100,
+      box.padding = 0.5,
+      point.padding = 0.3,
+      segment.color = "grey50"
+    ) +
+    ggplot2::facet_wrap(~ Cluster, scales = "free_y", ncol = 3) +
+    ggplot2::labs(
+      title = "Volcano Plots of Differential Proteins by Neighborhood Cluster",
+      x = "Mean Difference (Target - Control)", y = "-log10(Adjusted p-value)",
+      color = "Significance"
+    ) +
+    ggplot2::theme_bw(base_size = 12) +
+    ggplot2::theme(
+      strip.text = ggplot2::element_text(face = "bold"),
+      legend.position = "right"
+    )
+
   if (save_plot) {
     if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-    out_name <- if (is.null(cn_cluster)) filename else paste0(filename, "_cluster_", paste(cn_cluster, collapse = "_"))
-    ggplot2::ggsave(file.path(output_dir, paste0(out_name, ".pdf")), p, width = 12, height = 8)
+    ggplot2::ggsave(file.path(output_dir, paste0(filename, ".pdf")), p, width = 12, height = 8)
     message("Plots saved to: ", output_dir)
   }
-  p
+
+  return(p)
 }
 
 #' Perform cluster-specific protein enrichment analysis
@@ -222,7 +173,7 @@ plot_volcano_cn_clusters <- function(diff_results,
 #' @param protein_databases Character vector of EnrichR databases (optional)
 #' @param custom_databases Custom databases to include (optional)
 #' @param pvalueCutoff Significance cutoff (default: 0.05)
-#' @param log2FC_cutoff Minimum log2 fold change (default: 0)
+#' @param mean_diff_cutoff Minimum mean difference, Target - Control (default: 0)
 #' @param use_adj_pvalue Whether to use adjusted p-values (default: TRUE)
 #' @return Data frame with enrichment results
 #' @export
@@ -233,7 +184,7 @@ perform_cluster_enrichment <- function(
     protein_databases = NULL,
     custom_databases = NULL,
     pvalueCutoff = 0.05,
-    log2FC_cutoff = 0,
+    mean_diff_cutoff = 0,
     use_adj_pvalue = TRUE
 ) {
   required_pkgs <- c("dplyr", "enrichR")
@@ -261,7 +212,7 @@ perform_cluster_enrichment <- function(
     protein_databases <- unique(c(protein_databases, custom_databases))
   }
 
-  need <- c("Protein", "Cluster", "Log2FC", "p.value", "adj.p.value")
+  need <- c("Protein", "Cluster", "MeanDiff", "p.value", "adj.p.value")
   if (!all(need %in% colnames(diff_results))) {
     stop("Missing columns: ", paste(setdiff(need, colnames(diff_results)), collapse = ", "))
   }
@@ -297,7 +248,7 @@ perform_cluster_enrichment <- function(
     sig_genes <- diff_results %>%
       filter(
         Cluster == cl,
-        abs(Log2FC) > log2FC_cutoff,
+        abs(MeanDiff) > mean_diff_cutoff,
         if (use_adj_pvalue) adj.p.value < pvalueCutoff else p.value < pvalueCutoff
       ) %>%
       pull(Protein) %>% unique()
@@ -383,7 +334,7 @@ plot_enrichment_results <- function(
 ) {
 
   required_pkgs <- c("dplyr", "ggplot2", "scales", "stringr", "viridis")
-  miss <- setdiff(required_pkgs, rownames(utils::installed.packages()))
+  miss <- setdiff(required_pkgs, rownames(installed.packages()))
   if (length(miss)) stop("Please install required packages: ", paste(miss, collapse = ", "))
 
   required_cols <- c("Cluster", "FDR", "Term", "GenesN")
@@ -392,15 +343,15 @@ plot_enrichment_results <- function(
   }
 
   enrich_top <- cluster_enrich %>%
-    dplyr::filter(FDR < fdr_cutoff) %>%
-    dplyr::group_by(Cluster) %>%
-    dplyr::arrange(FDR) %>%
-    dplyr::slice_head(n = top_n) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
+    filter(FDR < fdr_cutoff) %>%
+    group_by(Cluster) %>%
+    arrange(FDR) %>%
+    slice_head(n = top_n) %>%
+    ungroup() %>%
+    mutate(
       log10FDR = -log10(FDR),
-      Term_short = stringr::str_replace(Term, " \\(.*", ""),
-      Term_short = stringr::str_trunc(Term_short, term_trunc_length)
+      Term_short = str_replace(Term, " \\(.*", ""),
+      Term_short = str_trunc(Term_short, term_trunc_length)
     )
 
   if (nrow(enrich_top) == 0) {
@@ -408,46 +359,46 @@ plot_enrichment_results <- function(
     return(list())
   }
 
-  sci_theme <- ggplot2::theme_bw(base_size = base_font_size) +
-    ggplot2::theme(
-      text            = ggplot2::element_text(family = "Arial", colour = "black"),
-      plot.title      = ggplot2::element_text(face = "bold", size = base_font_size + 1,
-                                              hjust = 0.5, margin = ggplot2::margin(b = 3)),
-      axis.title      = ggplot2::element_text(face = "bold", size = base_font_size),
-      axis.text.x     = ggplot2::element_text(size = base_font_size, angle = 45, hjust = 1, vjust = 1),
-      axis.text.y     = ggplot2::element_text(size = base_font_size),
-      axis.ticks      = ggplot2::element_line(linewidth = 0.3),
-      panel.grid      = ggplot2::element_blank(),
-      panel.border    = ggplot2::element_rect(fill = NA, linewidth = 0.3),
-      legend.text     = ggplot2::element_text(size = base_font_size - 0.5),
-      legend.title    = ggplot2::element_text(size = base_font_size, face = "bold"),
+  sci_theme <- theme_bw(base_size = base_font_size) +
+    theme(
+      text            = element_text(family = "Arial", colour = "black"),
+      plot.title      = element_text(face = "bold", size = base_font_size + 1,
+                                     hjust = 0.5, margin = margin(b = 3)),
+      axis.title      = element_text(face = "bold", size = base_font_size),
+      axis.text.x     = element_text(size = base_font_size, angle = 45, hjust = 1, vjust = 1),
+      axis.text.y     = element_text(size = base_font_size),
+      axis.ticks      = element_line(linewidth = 0.3),
+      panel.grid      = element_blank(),
+      panel.border    = element_rect(fill = NA, linewidth = 0.3),
+      legend.text     = element_text(size = base_font_size - 0.5),
+      legend.title    = element_text(size = base_font_size, face = "bold"),
       legend.box      = "horizontal",
       legend.position = "bottom",
-      strip.background = ggplot2::element_rect(fill = NA, colour = NA),
-      strip.text      = ggplot2::element_text(face = "bold", size = base_font_size),
-      plot.margin     = ggplot2::margin(2, 2, 2, 2, "pt")
+      strip.background= element_rect(fill = NA, colour = NA),
+      strip.text      = element_text(face = "bold", size = base_font_size),
+      plot.margin     = margin(2, 2, 2, 2, "pt")
     )
 
   n_clusters <- length(unique(enrich_top$Cluster))
   if (is.null(cluster_colors)) {
-    cluster_colors <- scales::hue_pal()(max(n_clusters, 30))
+    cluster_colors <- hue_pal()(max(n_clusters, 30))
   }
 
   plot_list <- list()
 
   if ("bar" %in% plot_types) {
-    p_bar <- ggplot2::ggplot(enrich_top, ggplot2::aes(x = log10FDR, y = stats::reorder(Term_short, log10FDR), fill = Cluster)) +
-      ggplot2::geom_col(width = 0.8, alpha = 0.9) +
-      ggplot2::facet_wrap(~ Cluster, scales = "free_y", ncol = 2) +
-      ggplot2::scale_fill_manual(values = stats::setNames(cluster_colors, unique(enrich_top$Cluster))) +
-      ggplot2::labs(
+    p_bar <- ggplot(enrich_top, aes(x = log10FDR, y = reorder(Term_short, log10FDR), fill = Cluster)) +
+      geom_col(width = 0.8, alpha = 0.9) +
+      facet_wrap(~ Cluster, scales = "free_y", ncol = 2) +
+      scale_fill_manual(values = setNames(cluster_colors, unique(enrich_top$Cluster))) +
+      labs(
         x = expression(-log[10](FDR)),
         y = "Enriched Biological Terms",
         title = "Top Enriched Terms by Cluster"
       ) +
       sci_theme +
-      ggplot2::theme(
-        axis.text.y = ggplot2::element_text(size = base_font_size + 2, lineheight = 0.8),
+      theme(
+        axis.text.y = element_text(size = base_font_size + 2, lineheight = 0.8),
         legend.position = "none"
       )
     plot_list$bar_plot <- p_bar
@@ -455,41 +406,41 @@ plot_enrichment_results <- function(
 
   if ("heatmap" %in% plot_types) {
     p_heatmap <- enrich_top %>%
-      ggplot2::ggplot(ggplot2::aes(x = Cluster, y = stats::reorder(Term_short, log10FDR), fill = log10FDR)) +
-      ggplot2::geom_tile(color = "white", linewidth = 0.8, height = 0.9, width = 0.9) +
-      ggplot2::scale_fill_viridis_c(option = "inferno", name = expression(-log[10](FDR))) +
-      ggplot2::labs(
+      ggplot(aes(x = Cluster, y = reorder(Term_short, log10FDR), fill = log10FDR)) +
+      geom_tile(color = "white", linewidth = 0.8, height = 0.9, width = 0.9) +
+      scale_fill_viridis_c(option = "inferno", name = expression(-log[10](FDR))) +
+      labs(
         x = "Cluster",
         y = "Enriched Biological Terms",
         title = "Enrichment Significance Heatmap"
       ) +
       sci_theme +
-      ggplot2::theme(
-        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = ggplot2::element_text(size = base_font_size + 2)
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(size = base_font_size + 2)
       )
     plot_list$heatmap <- p_heatmap
   }
 
   if ("dot" %in% plot_types) {
     p_dot <- enrich_top %>%
-      ggplot2::ggplot(ggplot2::aes(x = Cluster, y = stats::reorder(Term_short, log10FDR), size = GenesN, color = log10FDR)) +
-      ggplot2::geom_point(alpha = 0.85) +
-      ggplot2::scale_color_viridis_c(option = "turbo", name = expression(-log[10](FDR))) +
-      ggplot2::scale_size_continuous(
+      ggplot(aes(x = Cluster, y = reorder(Term_short, log10FDR), size = GenesN, color = log10FDR)) +
+      geom_point(alpha = 0.85) +
+      scale_color_viridis_c(option = "turbo", name = expression(-log[10](FDR))) +
+      scale_size_continuous(
         range = c(3, 10),
         name = "Gene Count",
         breaks = pretty(range(enrich_top$GenesN), n = 4)
       ) +
-      ggplot2::labs(
+      labs(
         x = "Cluster",
         y = "Enriched Biological Terms",
         title = "Enrichment Overview"
       ) +
       sci_theme +
-      ggplot2::theme(
-        axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
-        axis.text.y = ggplot2::element_text(size = base_font_size + 2),
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.text.y = element_text(size = base_font_size + 2),
         legend.box = "horizontal"
       )
     plot_list$dot_plot <- p_dot
@@ -499,8 +450,8 @@ plot_enrichment_results <- function(
     if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
     for (plot_name in names(plot_list)) {
-      ggplot2::ggsave(file.path(output_dir, paste0(plot_name, ".pdf")),
-                      plot_list[[plot_name]], width = 8, height = 10)
+      ggsave(file.path(output_dir, paste0(plot_name, ".pdf")),
+             plot_list[[plot_name]], width = 8, height = 10)
     }
     message("Plots saved to: ", output_dir)
   }
