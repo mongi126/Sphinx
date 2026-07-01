@@ -32,3 +32,11 @@ ggplot object
 \description{
 Plot volcano plots for differential proteins across all clusters
 }
+\examples{
+\donttest{
+df <- Sphinx:::.sphinx_example_protein_df(40)
+res <- perform_differential_expression(df)
+p <- plot_volcano_all_clusters(res)
+class(p)
+}
+}

@@ -26,3 +26,11 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize distance relationships using parallel coordinates plot
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+p <- visualize_distance_parallel(dist_res, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

@@ -35,3 +35,8 @@ List with window_size, sliding_step, mean_cells, x_range, y_range
 \description{
 Calculate optimal window size (Stereopy CCD-style)
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(50))
+ws <- calculate_optimal_window_size(df)
+ws$window_size
+}

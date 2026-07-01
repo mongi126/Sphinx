@@ -48,3 +48,9 @@ Generates spatial visualization of marker expression patterns:
 \item Saves high-quality PDF output with automatic sizing
 }
 }
+\examples{
+\dontrun{
+# Requires Akoya/phenocycler image slot in the Seurat object:
+# plot_spatial_markers(obj, markers = c("CD3", "CD8"))
+}
+}

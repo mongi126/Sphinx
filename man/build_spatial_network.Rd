@@ -40,3 +40,8 @@ This function builds a cell-cell spatial network using one of four methods
 ("radius", "knn", "delaunay", "window"). When \code{method = "auto"}, it
 selects the method based on robust spatial metrics computed from the data.
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+head(edges)
+}

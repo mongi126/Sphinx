@@ -37,3 +37,11 @@ Performs differential expression analysis to identify cluster biomarkers:
 \item Saves results to CSV file
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(30)
+markers <- find_top_markers(obj, save_path = tempfile(fileext = ".csv"),
+  assay = "RNA", min.pct = 0.1, logfc.threshold = 0.1)
+head(markers)
+}
+}

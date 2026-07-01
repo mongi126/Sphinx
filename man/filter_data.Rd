@@ -23,3 +23,10 @@ Performs two-step quality control filtering:
 \item Removes cells with low detected feature counts (quantile-based)
 }
 }
+\examples{
+\dontrun{
+obj <- Sphinx:::.sphinx_example_seurat(50)
+obj_filt <- filter_data(obj)
+ncol(obj_filt)
+}
+}

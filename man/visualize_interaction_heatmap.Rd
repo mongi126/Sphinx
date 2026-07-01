@@ -32,3 +32,12 @@ pheatmap object and saves plot to file if save_path provided
 \description{
 Visualize cell-cell interaction matrix
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+intx <- analyze_spatial_interactions(df, edges)
+visualize_interaction_heatmap(intx$interaction_matrix,
+  save_path = tempfile(fileext = ".pdf"))
+}
+}

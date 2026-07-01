@@ -22,6 +22,12 @@ spatial_colors <- c(
 #' @param fov Field of view specification (default: "phenocycler")
 #' @param ... Additional parameters passed to loading functions
 #' @return Seurat object containing spatial data
+#' @examples
+#' \dontrun{
+#' # From RDS or CSV files on disk:
+#' # obj <- load_spatial_data(filename = "sample.rds")
+#' # obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+#' }
 #' @export
 #'
 #' @description
@@ -130,6 +136,12 @@ load_spatial_data <- function(filename = NULL,
 #' @param nCount_mad_threshold MAD threshold for total count filtering (default: 3)
 #' @param nFeature_quantile_threshold Quantile threshold for detected features (default: 0.05)
 #' @return Filtered Seurat object
+#' @examples
+#' \dontrun{
+#' obj <- Sphinx:::.sphinx_example_seurat(50)
+#' obj_filt <- filter_data(obj)
+#' ncol(obj_filt)
+#' }
 #' @export
 #'
 #' @description
@@ -194,6 +206,15 @@ filter_data <- function(obj,
 #' @param dims Dimensions for reduction (default: 1:10)
 #' @param resolution Clustering resolution (default: 0.5)
 #' @return Processed Seurat object with dimensionality reduction and clustering
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(30)
+#' obj <- process_data(obj, dims = 1:3)
+#' }
+#' \dontrun{
+#' # Full-resolution clustering on real data:
+#' # obj <- process_data(obj, dims = 1:10, resolution = 0.5)
+#' }
 #' @export
 #'
 #' @description
@@ -308,6 +329,12 @@ process_data <- function(obj,
 #' @param obj Processed Seurat object
 #' @param save_path Output file path (default: "elbow_plot.pdf")
 #' @return ggplot object containing elbow plot
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(30)
+#' p <- plot_elbow(obj, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 #'
 #' @description
@@ -328,6 +355,12 @@ plot_elbow <- function(obj, save_path = "elbow_plot.pdf") {
 #'
 #' @param obj Seurat object with spatial data
 #' @return Seurat object with coordinates added to metadata (if not already present)
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(20)
+#' obj <- extract_spatial_coordinates(obj)
+#' head(obj@meta.data[, c("X", "Y")])
+#' }
 #' @export
 #'
 #' @description
@@ -375,6 +408,17 @@ extract_spatial_coordinates <- function(obj) {
 #' @param obj Processed Seurat object with spatial coordinates
 #' @param save_dir Output directory (default: "./")
 #' @return List containing UMAP and spatial plot objects
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' obj <- annotate_celltypes(obj,
+#'   cluster_ids = levels(obj@meta.data$seurat_clusters),
+#'   celltype_labels = paste0("Type", seq_along(levels(obj@meta.data$seurat_clusters)))
+#' )
+#' td <- tempdir()
+#' plots <- visualize_results(obj, save_dir = td)
+#' names(plots)
+#' }
 #' @export
 #'
 #' @description

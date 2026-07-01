@@ -5,6 +5,13 @@
 #' @param cluster_df Data frame with neighborhood cluster assignments and spatial coordinates
 #' @param expr_df Data frame with protein expression data (rows = cells, columns = proteins)
 #' @return Merged data frame containing spatial, cluster, and protein expression data
+#' @examples
+#' cluster_df <- Sphinx:::.sphinx_example_df(10)
+#' cluster_df$Neighborhood_Cluster <- sample(1:2, 10, replace = TRUE)
+#' expr_df <- data.frame(PD.1 = rnorm(10), CD3 = rnorm(10),
+#'   row.names = cluster_df$Cell_ID)
+#' merged <- prepare_protein_data(cluster_df, expr_df)
+#' nrow(merged)
 #' @export
 prepare_protein_data <- function(cluster_df, expr_df) {
   expr_df$Cell_ID <- rownames(expr_df)
@@ -44,8 +51,13 @@ prepare_protein_data <- function(cluster_df, expr_df) {
 #' @param protein_df Data frame with protein expression and cluster information
 #' @return Data frame with columns Mean_Target, Mean_Control, MeanDiff, p.value,
 #'   adj.p.value, and Significance
+#' @examples
+#' df <- Sphinx:::.sphinx_example_protein_df(40)
+#' res <- perform_differential_expression(df)
+#' head(res[, c("Protein", "Cluster", "MeanDiff")])
 #' @export
 perform_differential_expression <- function(protein_df) {
+  protein_df <- as.data.frame(protein_df)
   meta_cols <- c("Cell_ID", "X", "Y", "Neighborhood_Cluster", "Spatial_Zone")
   protein_cols <- setdiff(colnames(protein_df), meta_cols)
 
@@ -60,8 +72,8 @@ perform_differential_expression <- function(protein_df) {
     )
 
     cluster_results <- lapply(protein_cols, function(prot) {
-      target <- protein_df[protein_df$In_Cluster == "Target", prot]
-      control <- protein_df[protein_df$In_Cluster == "Control", prot]
+      target <- protein_df[[prot]][protein_df$In_Cluster == "Target"]
+      control <- protein_df[[prot]][protein_df$In_Cluster == "Control"]
 
       if (length(target) < 2 || length(control) < 2) {
         return(NULL)
@@ -106,6 +118,13 @@ perform_differential_expression <- function(protein_df) {
 #' @param output_dir Output directory for saving (default: "plots")
 #' @param filename Output filename (default: "volcano_plots")
 #' @return ggplot object
+#' @examples
+#' \donttest{
+#' df <- Sphinx:::.sphinx_example_protein_df(40)
+#' res <- perform_differential_expression(df)
+#' p <- plot_volcano_all_clusters(res)
+#' class(p)
+#' }
 #' @export
 plot_volcano_all_clusters <- function(diff_results, diff_thresh = 0.25, p_thresh = 0.05,
                                       save_plot = FALSE, output_dir = "plots",
@@ -176,6 +195,12 @@ plot_volcano_all_clusters <- function(diff_results, diff_thresh = 0.25, p_thresh
 #' @param mean_diff_cutoff Minimum mean difference, Target - Control (default: 0)
 #' @param use_adj_pvalue Whether to use adjusted p-values (default: TRUE)
 #' @return Data frame with enrichment results
+#' @examples
+#' \dontrun{
+#' # Requires clusterProfiler and org.Hs.eg.db:
+#' # res <- perform_differential_expression(Sphinx:::.sphinx_example_protein_df(40))
+#' # enrich <- perform_cluster_enrichment(res)
+#' }
 #' @export
 perform_cluster_enrichment <- function(
     diff_results,
@@ -320,6 +345,11 @@ perform_cluster_enrichment <- function(
 #' @param save_plot Whether to save plots (default: FALSE)
 #' @param output_dir Output directory for saving (default: "enrichment_plots")
 #' @return List of ggplot objects
+#' @examples
+#' \dontrun{
+#' # Requires enrichment results from perform_cluster_enrichment():
+#' # plot_enrichment_results(enrich)
+#' }
 #' @export
 plot_enrichment_results <- function(
     cluster_enrich,

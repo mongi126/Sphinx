@@ -40,3 +40,10 @@ Loads spatial data from either:
 \item Akoya platform data files
 }
 }
+\examples{
+\dontrun{
+# From RDS or CSV files on disk:
+# obj <- load_spatial_data(filename = "sample.rds")
+# obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+}
+}

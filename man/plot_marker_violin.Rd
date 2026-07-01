@@ -44,3 +44,12 @@ Generates violin plots showing expression distribution of marker proteins:
 \item Saves composite plot to PDF
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+markers <- rownames(obj)[1:3]
+p <- plot_marker_violin(obj, markers, assay = "RNA",
+  save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

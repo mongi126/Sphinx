@@ -18,3 +18,8 @@ Compares each neighborhood cluster to all other cells. For CLR-normalized
 protein values, reports mean difference (Target - Control) rather than
 log2 fold change to avoid redundant log transforms.
 }
+\examples{
+df <- Sphinx:::.sphinx_example_protein_df(40)
+res <- perform_differential_expression(df)
+head(res[, c("Protein", "Cluster", "MeanDiff")])
+}

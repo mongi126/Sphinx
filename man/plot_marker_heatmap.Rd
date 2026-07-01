@@ -42,3 +42,14 @@ Generates a heatmap visualizing average marker expression per cluster:
 \item Saves high-quality PDF output
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+mk <- find_top_markers(obj, save_path = tempfile(fileext = ".csv"),
+  assay = "RNA", min.pct = 0.1, logfc.threshold = 0.1)
+if (nrow(mk) > 0) {
+  plot_marker_heatmap(obj, mk, assay = "RNA",
+    save_path = tempfile(fileext = ".pdf"))
+}
+}
+}

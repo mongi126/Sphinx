@@ -26,3 +26,11 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize distance heatmap between cell types
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+p <- visualize_distance_heatmap(dist_res, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

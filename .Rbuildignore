@@ -14,3 +14,7 @@
 ^cran-comments.md$
 ^doc$
 ^Meta$
+^tools$
+^debug_.*\.log$
+^debug_.*\.R$
+^verify_.*\.R$

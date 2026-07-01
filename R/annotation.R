@@ -21,6 +21,13 @@ celltype_colors <- c(
 #' @param logfc.threshold Minimum log-fold change threshold (default: 0.25)
 #' @param only.pos Whether to return only positive markers (default: TRUE)
 #' @return Data frame containing top 5 markers per cluster
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(30)
+#' markers <- find_top_markers(obj, save_path = tempfile(fileext = ".csv"),
+#'   assay = "RNA", min.pct = 0.1, logfc.threshold = 0.1)
+#' head(markers)
+#' }
 #' @export
 #'
 #' @description
@@ -89,6 +96,14 @@ find_top_markers <- function(seurat_obj,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 30)
 #' @return ggplot object containing violin plots
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' markers <- rownames(obj)[1:3]
+#' p <- plot_marker_violin(obj, markers, assay = "RNA",
+#'   save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 #'
 #' @description
@@ -149,6 +164,16 @@ plot_marker_violin <- function(seurat_obj,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 8)
 #' @return Heatmap plot object
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' mk <- find_top_markers(obj, save_path = tempfile(fileext = ".csv"),
+#'   assay = "RNA", min.pct = 0.1, logfc.threshold = 0.1)
+#' if (nrow(mk) > 0) {
+#'   plot_marker_heatmap(obj, mk, assay = "RNA",
+#'     save_path = tempfile(fileext = ".pdf"))
+#' }
+#' }
 #' @export
 #'
 #' @description
@@ -222,6 +247,13 @@ plot_marker_heatmap <- function(seurat_obj,
 #' @param celltype_labels Vector of cell type labels corresponding to cluster_ids
 #' @param cluster_column Metadata column containing cluster IDs (default: "seurat_clusters")
 #' @return Seurat object with added "celltype" metadata
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(20)
+#' cls <- levels(obj@meta.data$seurat_clusters)
+#' obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+#' table(obj@meta.data$celltype)
+#' }
 #' @export
 #'
 #' @description
@@ -275,6 +307,14 @@ annotate_celltypes <- function(seurat_obj,
 #' @param width Plot width in inches (default: 11)
 #' @param height Plot height in inches (default: 8)
 #' @return ggplot object containing annotated UMAP
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' cls <- levels(obj@meta.data$seurat_clusters)
+#' obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+#' p <- plot_annotated_umap(obj, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 #'
 #' @description
@@ -326,6 +366,14 @@ plot_annotated_umap <- function(seurat_obj,
 #' @param height Plot height in inches (default: 8)
 #' @param point.size numeric, size of scatter points (default 0.5)
 #' @return ggplot object containing spatial distribution plot
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' cls <- levels(obj@meta.data$seurat_clusters)
+#' obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+#' p <- plot_spatial_distribution(obj, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 #'
 #' @description
@@ -388,6 +436,11 @@ plot_spatial_distribution <- function(seurat_obj,
 #' @param ncol Number of columns for multi-plot layout (default: 3)
 #' @param output_file Output file path (default: "spatial_markers.pdf")
 #' @return Combined ggplot object with spatial marker expression plots
+#' @examples
+#' \dontrun{
+#' # Requires Akoya/phenocycler image slot in the Seurat object:
+#' # plot_spatial_markers(obj, markers = c("CD3", "CD8"))
+#' }
 #' @export
 #'
 #' @description
@@ -506,6 +559,13 @@ plot_spatial_markers <- function(obj,
 #' @param width Plot width in inches (default: NULL, auto-calculated)
 #' @param height Plot height in inches (default: NULL, auto-calculated)
 #' @return Combined ggplot object with UMAP marker expression plots
+#' @examples
+#' \donttest{
+#' obj <- Sphinx:::.sphinx_example_seurat(25)
+#' p <- plot_umap_markers(obj, markers = rownames(obj)[1:2],
+#'   output_file = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 #'
 #' @description

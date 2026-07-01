@@ -32,3 +32,8 @@ List with distance statistics and recommended parameters
 \description{
 Calculate optimal spatial analysis parameters
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(50))
+params <- calculate_optimal_radius(df)
+names(params)
+}

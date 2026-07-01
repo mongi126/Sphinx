@@ -1,0 +1,24 @@
+{"sessionId":"48a66c","runId":"cran-prep","hypothesisId":"A","location":"debug_rcmdcheck.R","message":"rcmdcheck summary","data":{"errors":0,"warnings":0,"notes":3,"error_head":NA,"warning_head":NA,"note_head":"checking CRAN incoming feasibility ... [199s] NOTE
+Maintainer: 'Mengyi Yan <mongi126@163.com>'
+
+New submission
+
+Package has a VignetteBuilder field but no prebuilt vignette index.
+
+Found the following (possibly) invalid URLs:
+  URL: https://github.com/mongi126/Sphinx
+    From: DESCRIPTION
+    Status: Error
+    Message: libcurl error code 28:
+      	Failed to connect to github.com port 443 after 21246 ms: Could not connect to server
+  URL: https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml
+    From: README.md
+    Status: Error
+    Message: libcurl error code 28:
+      	Failed to connect to github.com port 443 after 21037 ms: Could not connect to server
+  URL: https://github.com/mongi126/Sphinx/issues
+    From: DESCRIPTION
+          inst/doc/workflow.html
+    Status: Error
+    Message: libcurl error code 28:
+      	Failed to connect to github.com port 443 after 21062 ms: Could not connect to server"},"timestamp":1782874522000} 

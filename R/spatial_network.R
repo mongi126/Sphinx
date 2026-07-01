@@ -8,6 +8,10 @@
 #' @param y_col Column name for Y coordinates (default: "Y")
 #' @param celltype_col Column name for cell types (default: "celltype")
 #' @return data.table with standardized structure for spatial analysis
+#' @examples
+#' df <- Sphinx:::.sphinx_example_df(30)
+#' df <- prepare_data(df)
+#' head(df[, .(Cell_ID, X, Y, celltype)])
 #' @export
 #'
 #' @description
@@ -101,6 +105,10 @@ prepare_data <- function(df,
 #' @param y_col Column name for Y coordinates (default: "Y")
 #' @param k_nn Nearest-neighbor rank used for distance summary (default: 10)
 #' @return List with distance statistics and recommended parameters
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(50))
+#' params <- calculate_optimal_radius(df)
+#' names(params)
 #' @export
 calculate_optimal_radius <- function(df,
                                      sample_size = 1000,
@@ -164,6 +172,10 @@ calculate_optimal_radius <- function(df,
 #' @param range_divisor Divisor for initial window size from spatial range (default: 100)
 #' @param max_iter Maximum adjustment iterations (default: 100)
 #' @return List with window_size, sliding_step, mean_cells, x_range, y_range
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(50))
+#' ws <- calculate_optimal_window_size(df)
+#' ws$window_size
 #' @export
 calculate_optimal_window_size <- function(df,
                                           x_col = "X",
@@ -203,6 +215,10 @@ calculate_optimal_window_size <- function(df,
 #' @param y_col Column name for Y coordinates (default: "Y")
 #' @param celltype_col Column name for cell types (default: "annotation")
 #' @return List with distance matrix and distributions
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+#' dim(dist_res$distance_matrix)
 #' @export
 calculate_celltype_distances <- function(df,
                                          x_col = "X",
@@ -295,6 +311,10 @@ calculate_celltype_distances <- function(df,
 #' @param celltype_col character, column with cell-type labels (optional)
 #' @param verbose logical, print decisions and key metrics
 #' @return data.table with columns: from, to, dist (and optional context columns)
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' head(edges)
 #' @export
 build_spatial_network <- function(
     df,
@@ -853,6 +873,11 @@ build_spatial_network <- function(
 #' @param cell_id_col Column name for cell IDs (default: "Cell_ID")
 #' @param celltype_col Column name for cell types (default: "celltype")
 #' @return Enhanced data.table with neighborhood type proportions
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' feat <- calculate_neighborhood_features(df, edges)
+#' names(feat)
 #' @export
 calculate_neighborhood_features <- function(df, edges,
                                             cell_id_col = "Cell_ID",
@@ -959,6 +984,14 @@ calculate_neighborhood_features <- function(df, edges,
 #' @param min_cluster_size Minimum points per cluster (for hdbscan)
 #' @param cluster_colname Name for the output cluster column
 #' @return Data.table with cluster assignments in cluster_colname
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' feat <- calculate_neighborhood_features(df, edges)
+#' cl <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 3)
+#' "Neighborhood_Cluster" %in% names(cl)
+#' }
 #' @export
 cluster_neighborhoods <- function(feature_df,
                                   spatial_edges = NULL,
@@ -1112,6 +1145,10 @@ cluster_neighborhoods <- function(feature_df,
 #' @param min_cells Integer, minimum number of neighbors required to compute purity.
 #' @param verbose Logical, print progress messages.
 #' @return A data.table with an added column `Neighborhood_Purity`.
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' out <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+#' summary(out$Neighborhood_Purity)
 #' @export
 calculate_neighborhood_purity <- function(df,
                                           x_col = "X",
@@ -1227,6 +1264,11 @@ calculate_neighborhood_purity <- function(df,
 #' @param edges Spatial network edges (data.frame with "from" and "to")
 #' @param celltype_col Column name for cell types in metadata.
 #' @return List with interaction matrix and network graph
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' intx <- analyze_spatial_interactions(df, edges)
+#' dim(intx$interaction_matrix)
 #' @export
 analyze_spatial_interactions <- function(df, edges,
                                          celltype_col = "celltype") {
@@ -1282,6 +1324,8 @@ analyze_spatial_interactions <- function(df, edges,
 #'
 #' @param n Number of colors needed
 #' @return Vector of color codes
+#' @examples
+#' get_color_palette(5)
 #' @export
 #'
 #' @description
@@ -1318,6 +1362,12 @@ get_color_palette <- function(n) {
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' p <- visualize_spatial_distribution(df, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_spatial_distribution <- function(df,
                                            x_col = "X",
@@ -1383,6 +1433,13 @@ visualize_spatial_distribution <- function(df,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+#' p <- visualize_distance_heatmap(dist_res, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_distance_heatmap <- function(dist_result,
                                        save_path = NULL,
@@ -1461,6 +1518,13 @@ visualize_distance_heatmap <- function(dist_result,
 #' @param width Plot width in inches (default: 14)
 #' @param height Plot height in inches (default: 8)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+#' p <- visualize_distance_parallel(dist_res, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_distance_parallel <- function(dist_result,
                                         save_path = NULL,
@@ -1533,6 +1597,13 @@ visualize_distance_parallel <- function(dist_result,
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' df <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+#' p <- visualize_neighborhood_purity(df, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_neighborhood_purity <- function(df,
                                           x_col = "X",
@@ -1590,6 +1661,11 @@ visualize_neighborhood_purity <- function(df,
 #' @param cluster_col Cluster column name (default: "Neighborhood_Cluster")
 #' @param celltype_col Cell type column name (default: "celltype")
 #' @return Data frame with cluster composition statistics
+#' @examples
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+#' comp <- calculate_cluster_composition(df)
+#' head(comp)
 #' @export
 calculate_cluster_composition <- function(df,
                                           cluster_col = "Neighborhood_Cluster",
@@ -1616,6 +1692,13 @@ calculate_cluster_composition <- function(df,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
 #' @return ComplexHeatmap object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+#' comp <- calculate_cluster_composition(df)
+#' plot_composition_heatmap(comp, save_path = tempfile(fileext = ".pdf"))
+#' }
 #' @export
 plot_composition_heatmap <- function(composition_df,
                                      cluster_col = "Neighborhood_Cluster",
@@ -1733,6 +1816,14 @@ plot_composition_heatmap <- function(composition_df,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 8)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+#' comp <- calculate_cluster_composition(df)
+#' p <- plot_composition_barplot(comp, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 plot_composition_barplot <- function(composition_df,
                                      cluster_col = "Neighborhood_Cluster",
@@ -1804,6 +1895,14 @@ plot_composition_barplot <- function(composition_df,
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
 #' @return pheatmap object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' intx <- analyze_spatial_interactions(df, edges)
+#' visualize_interaction_heatmap(intx$interaction_matrix,
+#'   save_path = tempfile(fileext = ".pdf"))
+#' }
 #' @export
 visualize_interaction_heatmap <- function(interaction_matrix,
                                           transform = TRUE,
@@ -1870,6 +1969,13 @@ visualize_interaction_heatmap <- function(interaction_matrix,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' p <- visualize_spatial_network(df, edges, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_spatial_network <- function(df, edges,
                                       celltype_col = "celltype",
@@ -2008,6 +2114,14 @@ visualize_spatial_network <- function(df, edges,
 #' @param height Plot height in inches (default: 10)
 #' @param layout Network layout algorithm (default: "fr")
 #' @return ggraph object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' intx <- analyze_spatial_interactions(df, edges)
+#' p <- visualize_interaction_network(intx$network, save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_interaction_network <- function(network,
                                           node_size_range = c(5, 15),
@@ -2148,6 +2262,14 @@ visualize_interaction_network <- function(network,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
 #' @return ggplot object and saves plot to file if save_path provided
+#' @examples
+#' \donttest{
+#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#' df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+#' p <- visualize_voronoi(df, celltype_col = "celltype",
+#'   save_path = tempfile(fileext = ".pdf"))
+#' class(p)
+#' }
 #' @export
 visualize_voronoi <- function(df,
                               x_col = "X",

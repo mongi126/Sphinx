@@ -19,3 +19,9 @@ List with interaction matrix and network graph
 \description{
 Analyze spatial interactions between cell types
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+intx <- analyze_spatial_interactions(df, edges)
+dim(intx$interaction_matrix)
+}

@@ -41,3 +41,8 @@ A data.table with an added column \code{Neighborhood_Purity}.
 \description{
 Calculate neighborhood purity using flexible neighbor definitions
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+out <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+summary(out$Neighborhood_Purity)
+}

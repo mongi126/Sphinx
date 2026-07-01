@@ -35,3 +35,12 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize cluster composition as bar plot
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+comp <- calculate_cluster_composition(df)
+p <- plot_composition_barplot(comp, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

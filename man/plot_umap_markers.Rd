@@ -55,3 +55,11 @@ Generates UMAP visualization of marker expression patterns:
 \item Saves high-quality PDF with automatic dimension calculation
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+p <- plot_umap_markers(obj, markers = rownames(obj)[1:2],
+  output_file = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

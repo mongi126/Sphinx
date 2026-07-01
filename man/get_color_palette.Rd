@@ -21,3 +21,6 @@ Creates optimized color palettes:
 Ensures distinct colors for all categories
 }
 }
+\examples{
+get_color_palette(5)
+}

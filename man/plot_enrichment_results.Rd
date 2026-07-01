@@ -41,3 +41,9 @@ List of ggplot objects
 \description{
 Generate publication-quality enrichment visualization plots
 }
+\examples{
+\dontrun{
+# Requires enrichment results from perform_cluster_enrichment():
+# plot_enrichment_results(enrich)
+}
+}

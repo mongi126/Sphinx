@@ -53,3 +53,10 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize spatial cell type distribution
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+p <- visualize_spatial_distribution(df, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

@@ -38,3 +38,13 @@ Performs comprehensive data processing pipeline:
 \item UMAP visualization
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(30)
+obj <- process_data(obj, dims = 1:3)
+}
+\dontrun{
+# Full-resolution clustering on real data:
+# obj <- process_data(obj, dims = 1:10, resolution = 0.5)
+}
+}

@@ -50,3 +50,11 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize neighborhood purity
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+df <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+p <- visualize_neighborhood_purity(df, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

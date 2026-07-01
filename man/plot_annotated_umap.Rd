@@ -32,3 +32,12 @@ Creates UMAP visualization colored by annotated cell types:
 \item Removes default title for cleaner presentation
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+p <- plot_annotated_umap(obj, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

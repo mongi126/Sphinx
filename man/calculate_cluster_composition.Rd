@@ -23,3 +23,9 @@ Data frame with cluster composition statistics
 \description{
 Calculate cluster composition metrics
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+comp <- calculate_cluster_composition(df)
+head(comp)
+}

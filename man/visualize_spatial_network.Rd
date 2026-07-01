@@ -68,3 +68,11 @@ ggplot object and saves plot to file if save_path provided
 \description{
 Visualize spatial network with flexible edge selection
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+p <- visualize_spatial_network(df, edges, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

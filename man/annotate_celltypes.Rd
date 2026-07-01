@@ -32,3 +32,11 @@ Assigns biological cell type annotations to clusters:
 \item Handles both numeric and character cluster IDs
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(20)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+table(obj@meta.data$celltype)
+}
+}

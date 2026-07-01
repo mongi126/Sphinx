@@ -26,3 +26,8 @@ List with distance matrix and distributions
 \description{
 Calculate distances between cell types
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+dist_res <- calculate_celltype_distances(df, celltype_col = "celltype")
+dim(dist_res$distance_matrix)
+}

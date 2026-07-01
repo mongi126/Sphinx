@@ -26,3 +26,9 @@ Enhanced data.table with neighborhood type proportions
 \description{
 Calculate neighborhood composition features
 }
+\examples{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+feat <- calculate_neighborhood_features(df, edges)
+names(feat)
+}

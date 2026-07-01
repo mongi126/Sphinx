@@ -18,3 +18,10 @@ ggplot object containing elbow plot
 Creates elbow plot to determine optimal number of PCA dimensions.
 Saves plot to specified path and returns ggplot object.
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(30)
+p <- plot_elbow(obj, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

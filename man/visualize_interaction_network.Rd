@@ -44,3 +44,12 @@ ggraph object and saves plot to file if save_path provided
 \description{
 Visualize spatial interaction network using graph layout
 }
+\examples{
+\donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+intx <- analyze_spatial_interactions(df, edges)
+p <- visualize_interaction_network(intx$network, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

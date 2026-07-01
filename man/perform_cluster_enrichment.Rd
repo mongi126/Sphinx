@@ -38,3 +38,10 @@ Data frame with enrichment results
 \description{
 Perform cluster-specific protein enrichment analysis
 }
+\examples{
+\dontrun{
+# Requires clusterProfiler and org.Hs.eg.db:
+# res <- perform_differential_expression(Sphinx:::.sphinx_example_protein_df(40))
+# enrich <- perform_cluster_enrichment(res)
+}
+}

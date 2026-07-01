@@ -21,3 +21,15 @@ Generates and saves two key visualizations:
 \item Spatial scatter plot showing cluster distribution in tissue context
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+obj <- annotate_celltypes(obj,
+  cluster_ids = levels(obj@meta.data$seurat_clusters),
+  celltype_labels = paste0("Type", seq_along(levels(obj@meta.data$seurat_clusters)))
+)
+td <- tempdir()
+plots <- visualize_results(obj, save_dir = td)
+names(plots)
+}
+}

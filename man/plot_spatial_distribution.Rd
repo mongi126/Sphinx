@@ -36,3 +36,12 @@ Generates spatial scatter plot showing cell type distribution:
 \item Enhances legend readability for complex annotations
 }
 }
+\examples{
+\donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+p <- plot_spatial_distribution(obj, save_path = tempfile(fileext = ".pdf"))
+class(p)
+}
+}

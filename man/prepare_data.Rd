@@ -35,3 +35,8 @@ Prepares spatial data for network analysis by:
 \item Removing invalid coordinates and missing cell types
 }
 }
+\examples{
+df <- Sphinx:::.sphinx_example_df(30)
+df <- prepare_data(df)
+head(df[, .(Cell_ID, X, Y, celltype)])
+}
