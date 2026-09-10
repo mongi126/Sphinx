@@ -2,21 +2,27 @@
 % Please edit documentation in R/spatial_network.R
 \name{.edges_window}
 \alias{.edges_window}
-\title{Build edges using window method}
+\title{Build edges with a Stereopy-style sliding window + local kNN}
 \usage{
-.edges_window(df, k, tile)
+.edges_window(df, k, tile, sliding_step = NULL, max_edge_length = NULL)
 }
 \arguments{
 \item{df}{data.table with spatial data}
 
-\item{k}{number of neighbors}
+\item{k}{number of neighbors inside each window}
 
-\item{tile}{window size}
+\item{tile}{window side length (Stereopy \code{d})}
+
+\item{sliding_step}{window stride (Stereopy \code{s}; default \code{tile / 2})}
+
+\item{max_edge_length}{optional maximum edge length filter}
 }
 \value{
 data.table with edges
 }
 \description{
-Build edges using window method
+Windows of side \code{tile} (\code{window_size}) slide over the field with stride
+\code{sliding_step} (default half the window). Inside each window a kNN graph
+is built; overlapping windows are merged (undirected, shortest edge kept).
 }
 \keyword{internal}

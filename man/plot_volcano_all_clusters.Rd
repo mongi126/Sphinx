@@ -8,9 +8,14 @@ plot_volcano_all_clusters(
   diff_results,
   diff_thresh = 0.25,
   p_thresh = 0.05,
+  y_cap = 50,
+  base_size = 14,
+  ncol = 3,
   save_plot = FALSE,
   output_dir = "plots",
-  filename = "volcano_plots"
+  filename = "volcano_plots",
+  width = 12,
+  height = 8
 )
 }
 \arguments{
@@ -20,17 +25,28 @@ plot_volcano_all_clusters(
 
 \item{p_thresh}{P-value threshold (default: 0.05)}
 
+\item{y_cap}{Truncation for -log10(adj.p.value) (default: 50)}
+
+\item{base_size}{Base font size (default: 14)}
+
+\item{ncol}{Number of facet columns (default: 3)}
+
 \item{save_plot}{Whether to save the plot (default: FALSE)}
 
 \item{output_dir}{Output directory for saving (default: "plots")}
 
 \item{filename}{Output filename (default: "volcano_plots")}
+
+\item{width}{Plot width in inches (default: 12)}
+
+\item{height}{Plot height in inches (default: 8)}
 }
 \value{
 ggplot object
 }
 \description{
-Plot volcano plots for differential proteins across all clusters
+Y-axis \code{-log10(adj.p)} is capped at \code{y_cap} (default 50). Points exceeding
+the cap are drawn as upward triangles on the truncation line.
 }
 \examples{
 \donttest{

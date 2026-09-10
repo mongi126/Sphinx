@@ -13,7 +13,7 @@ test_that("prepare_data standardizes spatial input", {
 
 test_that("build_spatial_network returns edges", {
   df <- prepare_data(Sphinx:::.sphinx_example_df(30))
-  edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+  edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
   expect_true(nrow(edges) > 0)
   expect_true(all(c("from", "to", "dist") %in% names(edges)))
 })

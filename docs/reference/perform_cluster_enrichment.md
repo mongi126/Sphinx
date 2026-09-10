@@ -13,44 +13,67 @@ perform_cluster_enrichment(
   custom_databases = NULL,
   pvalueCutoff = 0.05,
   mean_diff_cutoff = 0,
-  use_adj_pvalue = TRUE
+  use_adj_pvalue = TRUE,
+  background = NULL,
+  include_overlap = TRUE
 )
 ```
 
 ## Arguments
 
-- diff_results:
+  - diff\_results:
+    
+    Differential expression results
 
-  Differential expression results
+  - protein\_mapping:
+    
+    Optional protein to gene symbol mapping
 
-- protein_mapping:
+  - species:
+    
+    Species for database selection (default: "human")
 
-  Optional protein to gene symbol mapping
+  - protein\_databases:
+    
+    Character vector of EnrichR databases (optional)
 
-- species:
+  - custom\_databases:
+    
+    Custom databases to include (optional)
 
-  Species for database selection (default: "human")
+  - pvalueCutoff:
+    
+    Significance cutoff (default: 0.05)
 
-- protein_databases:
+  - mean\_diff\_cutoff:
+    
+    Minimum mean difference, Target - Control (default: 0)
 
-  Character vector of EnrichR databases (optional)
+  - use\_adj\_pvalue:
+    
+    Whether to use adjusted p-values (default: TRUE)
 
-- custom_databases:
+  - background:
+    
+    Character vector of background gene symbols. If NULL (default), uses
+    all unique proteins in `diff_results` (recommended for targeted
+    protein panels). Genome-wide EnrichR defaults are inappropriate when
+    only a small panel was assayed.
 
-  Custom databases to include (optional)
-
-- pvalueCutoff:
-
-  Significance cutoff (default: 0.05)
-
-- mean_diff_cutoff:
-
-  Minimum mean difference, Target - Control (default: 0)
-
-- use_adj_pvalue:
-
-  Whether to use adjusted p-values (default: TRUE)
+  - include\_overlap:
+    
+    logical; pass to enrichR when using background (default: TRUE)
 
 ## Value
 
 Data frame with enrichment results
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+# Requires clusterProfiler and org.Hs.eg.db:
+# res <- perform_differential_expression(Sphinx:::.sphinx_example_protein_df(40))
+# enrich <- perform_cluster_enrichment(res)
+} # }
+```

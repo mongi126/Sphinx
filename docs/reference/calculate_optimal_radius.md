@@ -17,30 +17,38 @@ calculate_optimal_radius(
 
 ## Arguments
 
-- df:
+  - df:
+    
+    Spatial data with coordinates
 
-  Spatial data with coordinates
+  - sample\_size:
+    
+    Maximum cells to sample for efficiency (default: 1000)
 
-- sample_size:
+  - multiplier:
+    
+    Factor for recommended radius (default: 2.0)
 
-  Maximum cells to sample for efficiency (default: 1000)
+  - x\_col:
+    
+    Column name for X coordinates (default: "X")
 
-- multiplier:
+  - y\_col:
+    
+    Column name for Y coordinates (default: "Y")
 
-  Factor for recommended radius (default: 2.0)
-
-- x_col:
-
-  Column name for X coordinates (default: "X")
-
-- y_col:
-
-  Column name for Y coordinates (default: "Y")
-
-- k_nn:
-
-  Nearest-neighbor rank used for distance summary (default: 10)
+  - k\_nn:
+    
+    Nearest-neighbor rank used for distance summary (default: 10)
 
 ## Value
 
 List with distance statistics and recommended parameters
+
+## Examples
+
+``` r
+df <- prepare_data(Sphinx:::.sphinx_example_df(50))
+params <- calculate_optimal_radius(df)
+names(params)
+```

@@ -28,38 +28,50 @@ plot_marker_violin(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with cluster annotations
 
-  Seurat object with cluster annotations
+  - markers:
+    
+    Vector of marker proteins to visualize
 
-- markers:
+  - group\_by:
+    
+    Metadata column for grouping (default: "seurat\_clusters")
 
-  Vector of marker proteins to visualize
+  - assay:
+    
+    Assay containing expression data (default: "Spatial")
 
-- group_by:
+  - ncol:
+    
+    Number of columns for multi-plot layout (default: 3)
 
-  Metadata column for grouping (default: "seurat_clusters")
+  - save\_path:
+    
+    Output file path (default: "allmarker.pdf")
 
-- assay:
+  - width:
+    
+    Plot width in inches (default: 12)
 
-  Assay containing expression data (default: "Spatial")
-
-- ncol:
-
-  Number of columns for multi-plot layout (default: 3)
-
-- save_path:
-
-  Output file path (default: "allmarker.pdf")
-
-- width:
-
-  Plot width in inches (default: 12)
-
-- height:
-
-  Plot height in inches (default: 30)
+  - height:
+    
+    Plot height in inches (default: 30)
 
 ## Value
 
 ggplot object containing violin plots
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+markers <- rownames(obj)[1:3]
+p <- plot_marker_violin(obj, markers, assay = "RNA",
+  save_path = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

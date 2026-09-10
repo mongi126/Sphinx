@@ -8,7 +8,9 @@ visualize_distance_heatmap(
   dist_result,
   save_path = NULL,
   width = 12,
-  height = 10
+  height = 10,
+  base_size = 14,
+  show_values = TRUE
 )
 }
 \arguments{
@@ -19,6 +21,10 @@ visualize_distance_heatmap(
 \item{width}{Plot width in inches (default: 12)}
 
 \item{height}{Plot height in inches (default: 10)}
+
+\item{base_size}{Base font size in points (default: 14; minimum 8)}
+
+\item{show_values}{Whether to print distance values in cells (default: TRUE)}
 }
 \value{
 ggplot object and saves plot to file if save_path provided

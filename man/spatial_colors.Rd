@@ -5,12 +5,13 @@
 \alias{spatial_colors}
 \title{Custom color palette for visualizations}
 \format{
-An object of class \code{character} of length 36.
+A character vector of hex color codes.
 }
 \usage{
 spatial_colors
 }
 \description{
-A predefined vector of 36 distinct colors for consistent plotting
+Distinct candy qualitative colors used for cluster UMAP / spatial views in
+preprocessing helpers.
 }
 \keyword{datasets}

@@ -10,11 +10,14 @@ visualize_spatial_distribution(
   y_col = "Y",
   celltype_col = "celltype",
   point_size = 1.5,
-  point_alpha = 0.6,
+  point_alpha = 0.85,
   point_shape = 16,
   legend_point_size = 3,
   title = NULL,
   legend.position = "right",
+  base_size = 14,
+  color_palette = NULL,
+  all_levels = NULL,
   save_path = NULL,
   width = 10,
   height = 8
@@ -40,6 +43,12 @@ visualize_spatial_distribution(
 \item{title}{Plot title}
 
 \item{legend.position}{Legend position (default: "right")}
+
+\item{base_size}{Base font size in points (default: 14; minimum 8)}
+
+\item{color_palette}{Optional named color vector; if NULL uses assign_celltype_colors()}
+
+\item{all_levels}{Optional full label set for stable colors when subsetting / zooming}
 
 \item{save_path}{Output file path (optional)}
 

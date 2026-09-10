@@ -10,52 +10,71 @@ plot_enrichment_results(
   top_n = 5,
   fdr_cutoff = 0.05,
   term_trunc_length = 40,
-  base_font_size = 7,
+  base_font_size = 12,
   cluster_colors = NULL,
   plot_types = c("bar", "heatmap", "dot"),
   save_plot = FALSE,
-  output_dir = "enrichment_plots"
+  output_dir = "enrichment_plots",
+  width = 9,
+  height = 10
 )
 ```
 
 ## Arguments
 
-- cluster_enrich:
+  - cluster\_enrich:
+    
+    Enrichment results data frame
 
-  Enrichment results data frame
+  - top\_n:
+    
+    Number of top terms to show per cluster (default: 5)
 
-- top_n:
+  - fdr\_cutoff:
+    
+    FDR cutoff for filtering (default: 0.05)
 
-  Number of top terms to show per cluster (default: 5)
+  - term\_trunc\_length:
+    
+    Length to truncate term names (default: 40)
 
-- fdr_cutoff:
+  - base\_font\_size:
+    
+    Base font size for plots (default: 7)
 
-  FDR cutoff for filtering (default: 0.05)
+  - cluster\_colors:
+    
+    Optional vector of colors for clusters
 
-- term_trunc_length:
+  - plot\_types:
+    
+    Types of plots to generate (default: all)
 
-  Length to truncate term names (default: 40)
+  - save\_plot:
+    
+    Whether to save plots (default: FALSE)
 
-- base_font_size:
+  - output\_dir:
+    
+    Output directory for saving (default: "enrichment\_plots")
 
-  Base font size for plots (default: 7)
+  - width:
+    
+    Plot width in inches when saving (default: 9)
 
-- cluster_colors:
-
-  Optional vector of colors for clusters
-
-- plot_types:
-
-  Types of plots to generate (default: all)
-
-- save_plot:
-
-  Whether to save plots (default: FALSE)
-
-- output_dir:
-
-  Output directory for saving (default: "enrichment_plots")
+  - height:
+    
+    Plot height in inches when saving (default: 10)
 
 ## Value
 
 List of ggplot objects
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+# Requires enrichment results from perform_cluster_enrichment():
+# plot_enrichment_results(enrich)
+} # }
+```

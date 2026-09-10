@@ -12,7 +12,7 @@
     "  - Spatial network analysis\n",
     "  - Functional analysis\n",
     "Documentation: help(package = 'Sphinx')\n",
-    "Tutorial: vignette('sphinx-intro')\n",
+    "Tutorial: vignette('workflow', package = 'Sphinx')\n",
     "Issues: https://github.com/mongi126/Sphinx/issues\n"
   )
 

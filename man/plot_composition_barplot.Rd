@@ -11,7 +11,8 @@ plot_composition_barplot(
   value_col = "proportion",
   save_path = NULL,
   width = 12,
-  height = 8
+  height = 8,
+  base_size = 14
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ plot_composition_barplot(
 \item{width}{Plot width in inches (default: 12)}
 
 \item{height}{Plot height in inches (default: 8)}
+
+\item{base_size}{Base font size in points (default: 14; minimum 8)}
 }
 \value{
 ggplot object and saves plot to file if save_path provided

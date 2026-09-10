@@ -2,233 +2,189 @@
 title: "Spatial Network Analysis"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Spatial Network Analysis} 
+  %\VignetteIndexEntry{Spatial Network Analysis}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-This tutorial demonstrates the complete workflow for spatial network analysis using Sphinx package.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", fig.align = "center", out.width = "92%")
+```
 
-## Load Required Packages
+## Overview
 
-```{r load-packages, eval=FALSE}
+This module builds adaptive spatial graphs, derives neighborhood features and clusters, and visualizes distances, composition, purity, and cell-cell interactions.
+
+**Demo:** reg055_A (CODEX CRC, Schurch *et al.* 2020) with annotated cell-type labels from the annotation tutorial.
+
+## Load packages and prepare data
+
+```{r prep, eval=FALSE}
 library(Sphinx)
 library(data.table)
+library(dplyr)
 library(ggplot2)
-library(ComplexHeatmap)
-```
 
-## 1.Data Preparation
-
-```{r data-prep, eval=FALSE}
-# Load spatial metadata
-df <- fread("tsu35_metadata.csv")
-
-# Prepare data for spatial analysis
-df <- prepare_data(df,
-                   cell_id_col = "V1",
-                   celltype_col = "celltype")
-```
-
-### Spatial Distribution of Cell Types
-
-```{r spatial-dist-celltypes, eval=FALSE}
-visualize_spatial_distribution(
-  df,
-  x_col = "X",
-  y_col = "Y",
-  celltype_col = "celltype",
-  point_size = 0.7,
-  title = "Spatial Distribution of Cell Types"
+# meta: Cell_ID, X, Y, celltype
+df <- prepare_data(
+  meta, cell_id_col = "Cell_ID", x_col = "X", y_col = "Y",
+  celltype_col = "celltype"
 )
 ```
 
+## Spatial distribution
 
-*Visualize spatial cell type distribution*
-
-## 2.Spatial Distance Analysis
-
-```{r distance-analysis, eval=FALSE}
-# Calculate optimal radius for neighborhood definition
-dist_info <- calculate_optimal_radius(df)
-message("Recommended radius: ", round(dist_info$recommended_radius, 2))
-
-# Calculate distances between cell types
-dist_result <- calculate_celltype_distances(df, celltype_col = "celltype")
-visualize_distance_heatmap(dist_result)
+```{r spat, eval=FALSE}
+visualize_spatial_distribution(
+  df, point_size = 0.45, point_alpha = 0.95,
+  title = "Annotated cell types"
+)
 ```
 
+```{r spat-fig, echo=FALSE, results='asis'}
+f <- "01_spatial_distribution_celltype.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
+```
 
-```{r distance-heatmap, eval=FALSE}
+## Cell-type distances
+
+```{r dist, eval=FALSE}
+dist_result <- calculate_celltype_distances(df, celltype_col = "celltype")
+visualize_distance_heatmap(dist_result, show_values = TRUE)
 visualize_distance_parallel(dist_result)
 ```
 
-## 3.Spatial Network Construction
-
-```{r network-construction, eval=FALSE}
-# Build spatial network using automatic method selection
-spatial_edges <- build_spatial_network(
-  df,
-  method = "auto",
-  celltype_col = "celltype"
-)
+```{r dist-fig, echo=FALSE, results='asis'}
+f <- "02_distance_heatmap.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-## 4.Neighborhood Feature Calculation
+## Build spatial network
 
-```{r neighborhood-features, eval=FALSE}
-# Calculate neighborhood composition features
-feature_df <- calculate_neighborhood_features(
-  df, 
-  spatial_edges,
-  celltype_col = "celltype"
-)
+`build_spatial_network()` selects a graph method (`auto` / knn / radius / delaunay / window) and applies biological edge filtering (mutual nearest neighbors and distance gating where configured).
+
+```{r net, eval=FALSE}
+edges <- build_spatial_network(df, method = "auto", celltype_col = "celltype")
+feat <- calculate_neighborhood_features(df, edges, celltype_col = "celltype")
+clus <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 10)
 ```
 
-## 5.Neighborhood Clustering
+## Neighborhood clusters & composition
 
-```{r neighborhood-clustering, eval=FALSE}
-# Cluster neighborhoods based on spatial features
-clustered_df <- cluster_neighborhoods(
-  feature_df = feature_df,
-  spatial_edges = spatial_edges,
-  method = "kmeans",
-  k = 12
-)
-
-message("Identified ", length(unique(clustered_df$Neighborhood_Cluster)), " neighborhood clusters")
-```
-
-### Neighborhood Clusters
-
-```{r neighborhood-clusters, eval=FALSE}
+```{r cn, eval=FALSE}
 visualize_spatial_distribution(
-  clustered_df,
-  x_col = "X", 
-  y_col = "Y",
-  celltype_col = "Neighborhood_Cluster",
-  point_size = 1.5,
-  point_alpha = 0.6,
-  title = "Neighborhood Clusters"
+  clus, celltype_col = "Neighborhood_Cluster",
+  point_size = 0.45, title = "Neighborhood clusters"
 )
+
+comp <- calculate_cluster_composition(clus)
+plot_composition_barplot(comp)
+plot_composition_heatmap(comp, cell_fontsize = 10)
 ```
 
-
-### Cluster Composition
-
-```{r cluster-composition, eval=FALSE}
-# Calculate cluster composition
-comp_df <- calculate_cluster_composition(
-  clustered_df,
-  cluster_col = "Neighborhood_Cluster", 
-  celltype_col = "celltype"
-)
-
-# Plot composition bar plot
-plot_composition_barplot(
-  comp_df,
-  cluster_col = "Neighborhood_Cluster",
-  celltype_col = "celltype", 
-  value_col = "proportion"
-)
+```{r cn-fig, echo=FALSE, results='asis'}
+f <- "05_spatial_distribution_clusters.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-
-### Voronoi Diagram
-
-```{r voronoi, eval=FALSE}
-visualize_voronoi(
-  clustered_df,
-  coloring = "neighborhood",
-  celltype_col = "celltype",
-  neighborhood_col = "Neighborhood_Cluster"
-)
+```{r bar-fig, echo=FALSE, results='asis'}
+f <- "07_cluster_composition_barplot.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-
-## 6.Spatial Interaction Analysis
-
-```{r interaction-analysis, eval=FALSE}
-# Analyze cell-cell spatial interactions
-interaction_results <- analyze_spatial_interactions(
-  clustered_df,
-  spatial_edges,
-  celltype_col = "celltype"
-)
+```{r heat-comp-fig, echo=FALSE, results='asis'}
+f <- "06_composition_heatmap.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-### Cell-Cell Interactions
+## Neighborhood purity
 
-```{r interaction-heatmap, eval=FALSE}
+```{r purity, eval=FALSE}
+pur <- calculate_neighborhood_purity(clus, method = "knn", n_neighbors = 10)
+visualize_neighborhood_purity(pur, point_size = 0.55)
+```
+
+```{r purity-fig, echo=FALSE, results='asis'}
+f <- "04_neighborhood_purity.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
+```
+
+## Interactions
+
+```{r intx, eval=FALSE}
+intx <- analyze_spatial_interactions(clus, edges, celltype_col = "celltype")
+
 visualize_interaction_heatmap(
-  interaction_results$interaction_matrix, 
-  transform = TRUE
+  intx$interaction_matrix, transform = TRUE,
+  display_numbers = FALSE, cellwidth = 10, cellheight = 10
 )
+
+visualize_interaction_network(intx$network)
 ```
 
+```{r intx-hm, echo=FALSE, results='asis'}
+f <- "08_interaction_heatmap.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
+```
 
-### Spatial Network Visualization
+```{r intx-net, echo=FALSE, results='asis'}
+f <- "11_cell_interaction_network.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
+```
 
-```{r spatial-network, eval=FALSE}
+## Spatial network graph (real edges)
+
+Points are opaque with a white halo so colors remain clear over edges. For overview plots use `edge_mode = "top"`; for local zoom, shrink `zoom_radius` and downsample edges with `edge_mode = "random"` so structure stays readable.
+
+```{r spatnet, eval=FALSE}
 visualize_spatial_network(
-  clustered_df,
-  spatial_edges,
-  celltype_col = "celltype",
-  x_col = "X",
-  y_col = "Y", 
-  edge_mode = "top",
-  top_n = 5,
-  point_size = 0.01,
-  point_alpha = 0.7,
-  edge_size_range = c(0.3, 2),
-  edge_alpha_range = c(0.3, 0.9),
-  edge_color = "black"
+  clus, edges, edge_mode = "top", top_n = 1200,
+  point_size = 0.5, point_alpha = 1
+)
+
+cx <- mean(range(clus$X)); cy <- mean(range(clus$Y))
+zr <- max(diff(range(clus$X)), diff(range(clus$Y))) * 0.07
+visualize_spatial_network(
+  clus, edges,
+  edge_mode = "random", max_edges = 180,
+  zoom_center = c(cx, cy), zoom_radius = zr,
+  point_size = 2.2, point_alpha = 1,
+  title = "Spatial network (local zoom)"
 )
 ```
 
-
-### Interaction Network Graph
-
-```{r interaction-network, eval=FALSE}
-visualize_interaction_network(
-  interaction_results$network,
-  node_size_range = c(5, 15),
-  edge_size_range = c(0.5, 3),
-  label_size = 4,
-  show_labels = TRUE,
-  max_nodes = 50
-)
+```{r spatnet-fig, echo=FALSE, results='asis'}
+f <- "10_spatial_network.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-
-## 7.Neighborhood Purity Analysis
-
-```{r purity-analysis, eval=FALSE}
-# Calculate neighborhood purity using radius method
-neighborhood_purity <- calculate_neighborhood_purity(
-  clustered_df,
-  x_col = "X",
-  y_col = "Y", 
-  celltype_col = "celltype",
-  method = "radius",
-  radius = 16.8,
-  min_cells = 5,
-  verbose = TRUE
-)
+```{r spatnet-zoom, echo=FALSE, results='asis'}
+f <- "10_spatial_network_zoom.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
 ```
 
-### Neighborhood Purity Graph
+## Voronoi view
 
-```{r neighborhood_purity, eval=FALSE}
-visualize_neighborhood_purity(
-    neighborhood_purity,
-    x_col = "X",
-    y_col = "Y",
-    celltype_col = "celltype",
-    # max_points = 1000,
-    point_size = 1.0,
-    point_alpha = 0.8,
-    title = "Neighborhood Purity"
-  )
+```{r vor, eval=FALSE}
+visualize_voronoi(clus, coloring = "neighborhood")
 ```
 
+```{r vor-fig, echo=FALSE, results='asis'}
+f <- "12_voronoi_neighborhood.png"
+if (file.exists(f)) knitr::include_graphics(f) else
+  cat("*Figure available on https://mongi126.github.io/Sphinx/*\n")
+```
+
+## Next step
+
+`vignette("functional", package = "Sphinx")`

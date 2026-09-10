@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/Lato-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Lato-0.4.10/font.css" rel="stylesheet">
 <link href="../deps/Roboto_Condensed-0.4.10/font.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">Sphinx: Spatial Proteomics Analysis Toolkit</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,9 +63,6 @@
   </div>
 </nav><div class="container template-article">
 
-
-
-
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Workflow</h1>
@@ -80,126 +77,96 @@
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p><strong>Sphinx</strong> is an R package for <strong>spatial
-proteomics analysis</strong>. It provides an end-to-end workflow built
-on <a href="https://satijalab.org/seurat/" class="external-link">Seurat</a> for:</p>
+<p><strong>Sphinx</strong> is an R toolkit for <strong>spatial proteomics</strong>. It organizes common analysis steps into four focused modules that you can use together or independently:</p>
 <ul>
-<li>Data preprocessing and quality control</li>
-<li>Cell-type annotation and marker discovery</li>
-<li>Spatial neighborhood modeling and interaction analysis</li>
-<li>Functional enrichment and publication-ready visualization</li>
+<li>Preprocessing and quality control</li>
+<li>Marker discovery and cell-type annotation</li>
+<li>Spatial neighborhood graphs and interaction analysis</li>
+<li>Differential proteins, enrichment, and publication-ready figures</li>
 </ul>
-<p>Sphinx supports common spatial proteomics platforms (e.g., CODEX,
-CyCIF, IMC) and accepts tabular count matrices with spatial
-coordinates.</p>
+<p>Tutorials use <strong>reg055_A</strong> from the public CODEX colorectal carcinoma cohort of Schurch <em>et al.</em>, <em>Cell</em> (2020) (<a href="https://data.mendeley.com/datasets/mpjzbtfgfr/1" class="external-link">data</a>): ~3.9k cells and 58 proteins, with published <code>ClusterName</code> labels that we map onto reclustered identities for the worked examples.</p>
+<p><img src="workflow.png" class="r-plt" width="100%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>Install the development version from GitHub (see
-<code><a href="../articles/installation.html">vignette("installation", package = "Sphinx")</a></code> for
-details):</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"mongi126/Sphinx"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># remotes::install_github("mongi126/Sphinx")</span></span>
+<span><span class="co"># or: install.packages("Sphinx_1.0.1.tar.gz", repos = NULL, type = "source")</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mongi126.github.io/Sphinx/">Sphinx</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"Sphinx"</span><span class="op">)</span></span></code></pre></div>
+<p>See <code><a href="../articles/installation.html">vignette("installation", package = "Sphinx")</a></code> for details.</p>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
-<p>The typical analysis pipeline follows four sequential modules. Each
-step produces a Seurat object that feeds into the next:</p>
+<p>With a table of <code>Cell_ID</code>, <code>X</code>, <code>Y</code>, and <code>celltype</code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mongi126.github.io/Sphinx/">Sphinx</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 1. Preprocessing</span></span>
-<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/load_spatial_data.html">load_spatial_data</a></span><span class="op">(</span><span class="st">"your_data.csv"</span><span class="op">)</span></span>
-<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/filter_data.html">filter_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
-<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/process_data.html">process_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prepare_data.html">prepare_data</a></span><span class="op">(</span><span class="va">meta</span>, cell_id_col <span class="op">=</span> <span class="st">"Cell_ID"</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 2. Cell annotation</span></span>
-<span><span class="va">markers</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/find_top_markers.html">find_top_markers</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
-<span><span class="va">obj</span>     <span class="op">&lt;-</span> <span class="fu"><a href="../reference/annotate_celltypes.html">annotate_celltypes</a></span><span class="op">(</span><span class="va">obj</span>, <span class="va">markers</span><span class="op">)</span></span>
+<span><span class="va">dist_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_celltype_distances.html">calculate_celltype_distances</a></span><span class="op">(</span><span class="va">df</span><span class="op">)</span></span>
+<span><span class="va">edges</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/build_spatial_network.html">build_spatial_network</a></span><span class="op">(</span><span class="va">df</span>, method <span class="op">=</span> <span class="st">"auto"</span><span class="op">)</span></span>
+<span><span class="va">feat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_features.html">calculate_neighborhood_features</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">edges</span><span class="op">)</span></span>
+<span><span class="va">clus</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cluster_neighborhoods.html">cluster_neighborhoods</a></span><span class="op">(</span><span class="va">feat</span>, <span class="va">edges</span>, method <span class="op">=</span> <span class="st">"kmeans"</span>, k <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 3. Spatial network</span></span>
-<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prepare_data.html">prepare_data</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
-<span><span class="va">net</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/build_spatial_network.html">build_spatial_network</a></span><span class="op">(</span><span class="va">obj</span>, method <span class="op">=</span> <span class="st">"knn"</span><span class="op">)</span></span>
-<span><span class="va">obj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_features.html">calculate_neighborhood_features</a></span><span class="op">(</span><span class="va">obj</span>, <span class="va">net</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># 4. Functional analysis</span></span>
-<span><span class="va">de_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/perform_differential_expression.html">perform_differential_expression</a></span><span class="op">(</span><span class="va">obj</span><span class="op">)</span></span>
-<span><span class="va">enrichment</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/perform_cluster_enrichment.html">perform_cluster_enrichment</a></span><span class="op">(</span><span class="va">de_results</span><span class="op">)</span></span></code></pre></div>
-<p>For platform-specific parameters and visualization options, see the
-module tutorials linked below.</p>
+<span><span class="fu"><a href="../reference/visualize_spatial_distribution.html">visualize_spatial_distribution</a></span><span class="op">(</span><span class="va">df</span>, point_size <span class="op">=</span> <span class="fl">0.45</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/visualize_distance_heatmap.html">visualize_distance_heatmap</a></span><span class="op">(</span><span class="va">dist_result</span>, show_values <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/visualize_spatial_network.html">visualize_spatial_network</a></span><span class="op">(</span></span>
+<span>  <span class="va">clus</span>, <span class="va">edges</span>, edge_mode <span class="op">=</span> <span class="st">"top"</span>, top_n <span class="op">=</span> <span class="fl">1500</span>, point_alpha <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="analysis-workflow">Analysis workflow<a class="anchor" aria-label="anchor" href="#analysis-workflow"></a>
+<h2 id="modules">Modules<a class="anchor" aria-label="anchor" href="#modules"></a>
 </h2>
-<p>The overall workflow is summarized below:</p>
-<p><img src="workflow.jpg" class="r-plt" alt="" width="100%"></p>
 <div class="section level3">
-<h3 id="module-1--data-preprocessing">Module 1. Data preprocessing<a class="anchor" aria-label="anchor" href="#module-1--data-preprocessing"></a>
+<h3 id="preprocessing">1. Preprocessing<a class="anchor" aria-label="anchor" href="#preprocessing"></a>
 </h3>
-<ul>
-<li>Import spatial data and standardize format
-(<code><a href="../reference/load_spatial_data.html">load_spatial_data()</a></code>)</li>
-<li>Filter low-quality cells and proteins
-(<code><a href="../reference/filter_data.html">filter_data()</a></code>)</li>
-<li>Normalize, scale, and cluster (<code><a href="../reference/process_data.html">process_data()</a></code>)</li>
-<li>Extract spatial coordinates
-(<code><a href="../reference/extract_spatial_coordinates.html">extract_spatial_coordinates()</a></code>)</li>
-</ul>
-<p><strong>Tutorial:</strong>
-<code><a href="../articles/preprocessing.html">vignette("preprocessing", package = "Sphinx")</a></code></p>
+<p>Load counts and coordinates, filter low-quality cells, normalize, and cluster.</p>
+<p><strong>Tutorial:</strong> <code><a href="../articles/preprocessing.html">vignette("preprocessing", package = "Sphinx")</a></code></p>
 </div>
 <div class="section level3">
-<h3 id="module-2--cell-annotation">Module 2. Cell annotation<a class="anchor" aria-label="anchor" href="#module-2--cell-annotation"></a>
+<h3 id="annotation">2. Annotation<a class="anchor" aria-label="anchor" href="#annotation"></a>
 </h3>
-<ul>
-<li>Identify cluster-specific marker proteins
-(<code><a href="../reference/find_top_markers.html">find_top_markers()</a></code>)</li>
-<li>Visualize markers on UMAP and spatial maps</li>
-<li>Annotate cell types automatically or manually
-(<code><a href="../reference/annotate_celltypes.html">annotate_celltypes()</a></code>)</li>
-</ul>
-<p><strong>Tutorial:</strong>
-<code><a href="../articles/annotation.html">vignette("annotation", package = "Sphinx")</a></code></p>
+<p>Find markers, review violin / heatmap / UMAP views, and assign readable cell-type labels.</p>
+<p><strong>Tutorial:</strong> <code><a href="../articles/annotation.html">vignette("annotation", package = "Sphinx")</a></code></p>
 </div>
 <div class="section level3">
-<h3 id="module-3--spatial-neighborhood-and-network">Module 3. Spatial neighborhood and network<a class="anchor" aria-label="anchor" href="#module-3--spatial-neighborhood-and-network"></a>
+<h3 id="spatial-networks">3. Spatial networks<a class="anchor" aria-label="anchor" href="#spatial-networks"></a>
 </h3>
-<ul>
-<li>Build spatial graphs (kNN, Delaunay, radius, or window methods)</li>
-<li>Compute neighborhood composition and spatial metrics</li>
-<li>Analyze cell–cell interactions and spatial organization</li>
-</ul>
-<p><strong>Tutorial:</strong>
-<code><a href="../articles/spatial-network.html">vignette("spatial-network", package = "Sphinx")</a></code></p>
+<p>Build adaptive graphs, derive neighborhood clusters, and plot distances, composition, purity, and interactions.</p>
+<p><strong>Tutorial:</strong> <code><a href="../articles/spatial-network.html">vignette("spatial-network", package = "Sphinx")</a></code></p>
 </div>
 <div class="section level3">
-<h3 id="module-4--functional-analysis">Module 4. Functional analysis<a class="anchor" aria-label="anchor" href="#module-4--functional-analysis"></a>
+<h3 id="functional-analysis">4. Functional analysis<a class="anchor" aria-label="anchor" href="#functional-analysis"></a>
 </h3>
-<ul>
-<li>Perform differential protein expression across clusters</li>
-<li>Run pathway enrichment (GO, KEGG, Reactome)</li>
-<li>Visualize enrichment and volcano plots</li>
-</ul>
-<p><strong>Tutorial:</strong>
-<code><a href="../articles/functional.html">vignette("functional", package = "Sphinx")</a></code></p>
+<p>Test neighborhood-associated proteins (spatial-block aware), draw volcano plots, and summarize enrichment.</p>
+<p><strong>Tutorial:</strong> <code><a href="../articles/functional.html">vignette("functional", package = "Sphinx")</a></code></p>
 </div>
+</div>
+<div class="section level2">
+<h2 id="visualization-defaults">Visualization defaults<a class="anchor" aria-label="anchor" href="#visualization-defaults"></a>
+</h2>
+<ul>
+<li>Stable candy qualitative colors via <code><a href="../reference/assign_celltype_colors.html">assign_celltype_colors()</a></code>
+</li>
+<li>Soft pink sequential heatmaps; fonts at least 8 pt</li>
+<li>
+<code><a href="../reference/visualize_spatial_network.html">visualize_spatial_network()</a></code> draws opaque points with a white halo; use <code>zoom_center</code> / <code>zoom_radius</code> for local views</li>
+<li>Volcano y-axis caps <code>-log10(adj.P)</code> (default 50)</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="getting-help">Getting help<a class="anchor" aria-label="anchor" href="#getting-help"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Package documentation</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/help.html" class="external-link">help</a></span><span class="op">(</span>package <span class="op">=</span> <span class="st">"Sphinx"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Function reference</span></span>
-<span><span class="op">?</span><span class="va">load_spatial_data</span></span>
-<span><span class="op">?</span><span class="va">build_spatial_network</span></span></code></pre></div>
-<p>Report bugs and request features on <a href="https://github.com/mongi126/Sphinx/issues" class="external-link">GitHub Issues</a>.</p>
+<ul>
+<li>Website: <a href="https://mongi126.github.io/Sphinx/" class="uri">https://mongi126.github.io/Sphinx/</a>
+</li>
+<li>Issues: <a href="https://github.com/mongi126/Sphinx/issues" class="external-link uri">https://github.com/mongi126/Sphinx/issues</a>
+</li>
+</ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -212,7 +179,7 @@ module tutorials linked below.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

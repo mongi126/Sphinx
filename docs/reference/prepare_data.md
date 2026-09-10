@@ -4,7 +4,7 @@ Prepares spatial data for network analysis by:
 
 1.  Converting to data.table if needed
 
-2.  Ensuring Cell_ID column exists
+2.  Ensuring Cell\_ID column exists
 
 3.  Converting coordinates to numeric
 
@@ -24,26 +24,34 @@ prepare_data(
 
 ## Arguments
 
-- df:
+  - df:
+    
+    Data frame containing spatial data
 
-  Data frame containing spatial data
+  - cell\_id\_col:
+    
+    Column name for cell IDs (default: NULL, auto-detect)
 
-- cell_id_col:
+  - x\_col:
+    
+    Column name for X coordinates (default: "X")
 
-  Column name for cell IDs (default: NULL, auto-detect)
+  - y\_col:
+    
+    Column name for Y coordinates (default: "Y")
 
-- x_col:
-
-  Column name for X coordinates (default: "X")
-
-- y_col:
-
-  Column name for Y coordinates (default: "Y")
-
-- celltype_col:
-
-  Column name for cell types (default: "celltype")
+  - celltype\_col:
+    
+    Column name for cell types (default: "celltype")
 
 ## Value
 
 data.table with standardized structure for spatial analysis
+
+## Examples
+
+``` r
+df <- Sphinx:::.sphinx_example_df(30)
+df <- prepare_data(df)
+head(df[, .(Cell_ID, X, Y, celltype)])
+```

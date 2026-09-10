@@ -4,17 +4,24 @@
 \alias{.edges_delaunay}
 \title{Build edges using Delaunay triangulation}
 \usage{
-.edges_delaunay(df, max_edge_length = NULL)
+.edges_delaunay(df, max_edge_length = NULL, k = 6L, chunk_max_points = 250000L)
 }
 \arguments{
 \item{df}{data.table with spatial data}
 
 \item{max_edge_length}{optional maximum edge length filter}
+
+\item{k}{neighbor count used only if \code{deldir} is missing (kNN fallback)}
+
+\item{chunk_max_points}{max points per chunk before tiling (default 2.5e5)}
 }
 \value{
 data.table with edges
 }
 \description{
-Build edges using Delaunay triangulation
+For large point sets, \code{deldir} (Fortran) fails with
+"long vectors are not supported in .Fortran". In that regime we tile the
+FOV into overlapping spatial chunks, triangulate each chunk, and merge
+undirected edges (deduplicated).
 }
 \keyword{internal}

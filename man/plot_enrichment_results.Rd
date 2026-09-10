@@ -9,11 +9,13 @@ plot_enrichment_results(
   top_n = 5,
   fdr_cutoff = 0.05,
   term_trunc_length = 40,
-  base_font_size = 7,
+  base_font_size = 12,
   cluster_colors = NULL,
   plot_types = c("bar", "heatmap", "dot"),
   save_plot = FALSE,
-  output_dir = "enrichment_plots"
+  output_dir = "enrichment_plots",
+  width = 9,
+  height = 10
 )
 }
 \arguments{
@@ -34,6 +36,10 @@ plot_enrichment_results(
 \item{save_plot}{Whether to save plots (default: FALSE)}
 
 \item{output_dir}{Output directory for saving (default: "enrichment_plots")}
+
+\item{width}{Plot width in inches when saving (default: 9)}
+
+\item{height}{Plot height in inches when saving (default: 10)}
 }
 \value{
 List of ggplot objects

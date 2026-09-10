@@ -4,7 +4,12 @@
 \alias{analyze_spatial_interactions}
 \title{Analyze spatial interactions between cell types}
 \usage{
-analyze_spatial_interactions(df, edges, celltype_col = "celltype")
+analyze_spatial_interactions(
+  df,
+  edges,
+  celltype_col = "celltype",
+  normalize_abundance = TRUE
+)
 }
 \arguments{
 \item{df}{Spatial data with cell types}
@@ -12,16 +17,32 @@ analyze_spatial_interactions(df, edges, celltype_col = "celltype")
 \item{edges}{Spatial network edges (data.frame with "from" and "to")}
 
 \item{celltype_col}{Column name for cell types in metadata.}
+
+\item{normalize_abundance}{logical; if TRUE (default), also compute
+abundance-normalized and enrichment matrices.}
 }
 \value{
-List with interaction matrix and network graph
+List with \code{interaction_matrix} (raw counts), \code{network}, and when
+\code{normalize_abundance = TRUE} also \code{abundance_normalized},
+\code{enrichment_matrix}, and \code{type_abundance}.
 }
 \description{
-Analyze spatial interactions between cell types
+Counts cell-type contact edges and optionally normalizes by type abundance
+so frequent types do not dominate the interaction matrix.
+}
+\details{
+Normalization:
+\itemize{
+\item \code{abundance_normalized}: \eqn{c_{ij} / (n_i n_j)}
+\item \code{enrichment_matrix}: observed / expected under random labeling of
+the same graph, where
+\eqn{E_{ij} = E \cdot 2 p_i p_j} (i != j) and
+\eqn{E_{ii} = E \cdot p_i^2}, with \eqn{p_i = n_i / N}.
+}
 }
 \examples{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 intx <- analyze_spatial_interactions(df, edges)
 dim(intx$interaction_matrix)
 }

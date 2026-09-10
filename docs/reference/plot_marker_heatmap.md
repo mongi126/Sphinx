@@ -2,7 +2,7 @@
 
 Generates a heatmap visualizing average marker expression per cluster:
 
-1.  Extracts unique markers from top_markers data frame
+1.  Extracts unique markers from top\_markers data frame
 
 2.  Computes average expression per cluster
 
@@ -28,34 +28,48 @@ plot_marker_heatmap(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with cluster annotations
 
-  Seurat object with cluster annotations
+  - top\_markers:
+    
+    Data frame from find\_top\_markers
 
-- top_markers:
+  - group\_by:
+    
+    Metadata column for grouping (default: "seurat\_clusters")
 
-  Data frame from find_top_markers
+  - assay:
+    
+    Assay containing expression data (default: "Spatial")
 
-- group_by:
+  - save\_path:
+    
+    Output file path (default: "marker\_heatmap.pdf")
 
-  Metadata column for grouping (default: "seurat_clusters")
+  - width:
+    
+    Plot width in inches (default: 12)
 
-- assay:
-
-  Assay containing expression data (default: "Spatial")
-
-- save_path:
-
-  Output file path (default: "marker_heatmap.pdf")
-
-- width:
-
-  Plot width in inches (default: 12)
-
-- height:
-
-  Plot height in inches (default: 8)
+  - height:
+    
+    Plot height in inches (default: 8)
 
 ## Value
 
 Heatmap plot object
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+mk <- find_top_markers(obj, save_path = tempfile(fileext = ".csv"),
+  assay = "RNA", min.pct = 0.1, logfc.threshold = 0.1)
+if (nrow(mk) > 0) {
+  plot_marker_heatmap(obj, mk, assay = "RNA",
+    save_path = tempfile(fileext = ".pdf"))
+}
+# }
+```

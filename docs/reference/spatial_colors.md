@@ -1,6 +1,7 @@
 # Custom color palette for visualizations
 
-A predefined vector of 36 distinct colors for consistent plotting
+Distinct candy qualitative colors used for cluster UMAP / spatial views
+in preprocessing helpers.
 
 ## Usage
 
@@ -10,4 +11,4 @@ spatial_colors
 
 ## Format
 
-An object of class `character` of length 36.
+A character vector of hex color codes.

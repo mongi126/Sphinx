@@ -4,17 +4,25 @@
 \alias{.edges_knn}
 \title{Build edges using kNN method}
 \usage{
-.edges_knn(df, k)
+.edges_knn(df, k, max_edge_length = NULL, n_cores = NULL)
 }
 \arguments{
 \item{df}{data.table with spatial data}
 
 \item{k}{number of neighbors}
+
+\item{max_edge_length}{optional maximum edge length filter}
+
+\item{n_cores}{parallel workers / search threads (NULL = auto)}
 }
 \value{
 data.table with edges
 }
 \description{
-Build edges using kNN method
+Exact k nearest neighbors via \code{BiocNeighbors::findKNN} (self excluded).
+Parallelism uses \code{num.threads} inside the search (fork-safe). For large
+point sets, query rows are processed in serial chunks via \verb{subset=} so peak
+memory stays bounded; chunk results concatenate to the same neighbors as a
+single full call (no downsampling).
 }
 \keyword{internal}

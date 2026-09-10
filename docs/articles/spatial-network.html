@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/Lato-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Lato-0.4.10/font.css" rel="stylesheet">
 <link href="../deps/Roboto_Condensed-0.4.10/font.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">Sphinx: Spatial Proteomics Analysis Toolkit</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,9 +63,6 @@
   </div>
 </nav><div class="container template-article">
 
-
-
-
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Spatial Network Analysis</h1>
@@ -77,228 +74,127 @@
 
     
     
-<p>This tutorial demonstrates the complete workflow for spatial network
-analysis using Sphinx package.</p>
 <div class="section level2">
-<h2 id="load-required-packages">Load Required Packages<a class="anchor" aria-label="anchor" href="#load-required-packages"></a>
+<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+</h2>
+<p>This module builds adaptive spatial graphs, derives neighborhood features and clusters, and visualizes distances, composition, purity, and cell-cell interactions.</p>
+<p><strong>Demo:</strong> reg055_A (CODEX CRC, Schurch <em>et al.</em> 2020) with annotated cell-type labels from the annotation tutorial.</p>
+</div>
+<div class="section level2">
+<h2 id="load-packages-and-prepare-data">Load packages and prepare data<a class="anchor" aria-label="anchor" href="#load-packages-and-prepare-data"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mongi126.github.io/Sphinx/">Sphinx</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/jokergoo/ComplexHeatmap" class="external-link">ComplexHeatmap</a></span><span class="op">)</span></span></code></pre></div>
+<span></span>
+<span><span class="co"># meta: Cell_ID, X, Y, celltype</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prepare_data.html">prepare_data</a></span><span class="op">(</span></span>
+<span>  <span class="va">meta</span>, cell_id_col <span class="op">=</span> <span class="st">"Cell_ID"</span>, x_col <span class="op">=</span> <span class="st">"X"</span>, y_col <span class="op">=</span> <span class="st">"Y"</span>,</span>
+<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="data-preparation">1.Data Preparation<a class="anchor" aria-label="anchor" href="#data-preparation"></a>
+<h2 id="spatial-distribution">Spatial distribution<a class="anchor" aria-label="anchor" href="#spatial-distribution"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Load spatial metadata</span></span>
-<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/fread.html" class="external-link">fread</a></span><span class="op">(</span><span class="st">"tsu35_metadata.csv"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Prepare data for spatial analysis</span></span>
-<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/prepare_data.html">prepare_data</a></span><span class="op">(</span><span class="va">df</span>,</span>
-<span>                   cell_id_col <span class="op">=</span> <span class="st">"V1"</span>,</span>
-<span>                   celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="spatial-distribution-of-cell-types">Spatial Distribution of Cell Types<a class="anchor" aria-label="anchor" href="#spatial-distribution-of-cell-types"></a>
-</h3>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_spatial_distribution.html">visualize_spatial_distribution</a></span><span class="op">(</span></span>
-<span>  <span class="va">df</span>,</span>
-<span>  x_col <span class="op">=</span> <span class="st">"X"</span>,</span>
-<span>  y_col <span class="op">=</span> <span class="st">"Y"</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span>,</span>
-<span>  point_size <span class="op">=</span> <span class="fl">0.7</span>,</span>
-<span>  title <span class="op">=</span> <span class="st">"Spatial Distribution of Cell Types"</span></span>
+<span>  <span class="va">df</span>, point_size <span class="op">=</span> <span class="fl">0.45</span>, point_alpha <span class="op">=</span> <span class="fl">0.95</span>,</span>
+<span>  title <span class="op">=</span> <span class="st">"Annotated cell types"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="01_spatial_distribution_celltype.jpg" width="700"></p>
-<p><em>Visualize spatial cell type distribution</em></p>
-</div>
+<p><img src="01_spatial_distribution_celltype.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
-<h2 id="spatial-distance-analysis">2.Spatial Distance Analysis<a class="anchor" aria-label="anchor" href="#spatial-distance-analysis"></a>
+<h2 id="cell-type-distances">Cell-type distances<a class="anchor" aria-label="anchor" href="#cell-type-distances"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Calculate optimal radius for neighborhood definition</span></span>
-<span><span class="va">dist_info</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_optimal_radius.html">calculate_optimal_radius</a></span><span class="op">(</span><span class="va">df</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Recommended radius: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">dist_info</span><span class="op">$</span><span class="va">recommended_radius</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Calculate distances between cell types</span></span>
-<span><span class="va">dist_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_celltype_distances.html">calculate_celltype_distances</a></span><span class="op">(</span><span class="va">df</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/visualize_distance_heatmap.html">visualize_distance_heatmap</a></span><span class="op">(</span><span class="va">dist_result</span><span class="op">)</span></span></code></pre></div>
-<p><img src="02_distance_heatmap.jpg" width="700"></p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_distance_parallel.html">visualize_distance_parallel</a></span><span class="op">(</span><span class="va">dist_result</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">dist_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_celltype_distances.html">calculate_celltype_distances</a></span><span class="op">(</span><span class="va">df</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/visualize_distance_heatmap.html">visualize_distance_heatmap</a></span><span class="op">(</span><span class="va">dist_result</span>, show_values <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/visualize_distance_parallel.html">visualize_distance_parallel</a></span><span class="op">(</span><span class="va">dist_result</span><span class="op">)</span></span></code></pre></div>
+<p><img src="02_distance_heatmap.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
-<h2 id="spatial-network-construction">3.Spatial Network Construction<a class="anchor" aria-label="anchor" href="#spatial-network-construction"></a>
+<h2 id="build-spatial-network">Build spatial network<a class="anchor" aria-label="anchor" href="#build-spatial-network"></a>
+</h2>
+<p><code><a href="../reference/build_spatial_network.html">build_spatial_network()</a></code> selects a graph method (<code>auto</code> / knn / radius / delaunay / window) and applies biological edge filtering (mutual nearest neighbors and distance gating where configured).</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">edges</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/build_spatial_network.html">build_spatial_network</a></span><span class="op">(</span><span class="va">df</span>, method <span class="op">=</span> <span class="st">"auto"</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
+<span><span class="va">feat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_features.html">calculate_neighborhood_features</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">edges</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
+<span><span class="va">clus</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cluster_neighborhoods.html">cluster_neighborhoods</a></span><span class="op">(</span><span class="va">feat</span>, <span class="va">edges</span>, method <span class="op">=</span> <span class="st">"kmeans"</span>, k <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="neighborhood-clusters-composition">Neighborhood clusters &amp; composition<a class="anchor" aria-label="anchor" href="#neighborhood-clusters-composition"></a>
+</h2>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_spatial_distribution.html">visualize_spatial_distribution</a></span><span class="op">(</span></span>
+<span>  <span class="va">clus</span>, celltype_col <span class="op">=</span> <span class="st">"Neighborhood_Cluster"</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fl">0.45</span>, title <span class="op">=</span> <span class="st">"Neighborhood clusters"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">comp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_cluster_composition.html">calculate_cluster_composition</a></span><span class="op">(</span><span class="va">clus</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/plot_composition_barplot.html">plot_composition_barplot</a></span><span class="op">(</span><span class="va">comp</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/plot_composition_heatmap.html">plot_composition_heatmap</a></span><span class="op">(</span><span class="va">comp</span>, cell_fontsize <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
+<p><img src="05_spatial_distribution_clusters.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
+<p><img src="07_cluster_composition_barplot.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
+<p><img src="06_composition_heatmap.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
+</div>
+<div class="section level2">
+<h2 id="neighborhood-purity">Neighborhood purity<a class="anchor" aria-label="anchor" href="#neighborhood-purity"></a>
 </h2>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Build spatial network using automatic method selection</span></span>
-<span><span class="va">spatial_edges</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/build_spatial_network.html">build_spatial_network</a></span><span class="op">(</span></span>
-<span>  <span class="va">df</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"auto"</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">pur</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_purity.html">calculate_neighborhood_purity</a></span><span class="op">(</span><span class="va">clus</span>, method <span class="op">=</span> <span class="st">"knn"</span>, n_neighbors <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/visualize_neighborhood_purity.html">visualize_neighborhood_purity</a></span><span class="op">(</span><span class="va">pur</span>, point_size <span class="op">=</span> <span class="fl">0.55</span><span class="op">)</span></span></code></pre></div>
+<p><img src="04_neighborhood_purity.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
-<h2 id="neighborhood-feature-calculation">4.Neighborhood Feature Calculation<a class="anchor" aria-label="anchor" href="#neighborhood-feature-calculation"></a>
+<h2 id="interactions">Interactions<a class="anchor" aria-label="anchor" href="#interactions"></a>
 </h2>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Calculate neighborhood composition features</span></span>
-<span><span class="va">feature_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_features.html">calculate_neighborhood_features</a></span><span class="op">(</span></span>
-<span>  <span class="va">df</span>, </span>
-<span>  <span class="va">spatial_edges</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">intx</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/analyze_spatial_interactions.html">analyze_spatial_interactions</a></span><span class="op">(</span><span class="va">clus</span>, <span class="va">edges</span>, celltype_col <span class="op">=</span> <span class="st">"celltype"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/visualize_interaction_heatmap.html">visualize_interaction_heatmap</a></span><span class="op">(</span></span>
+<span>  <span class="va">intx</span><span class="op">$</span><span class="va">interaction_matrix</span>, transform <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  display_numbers <span class="op">=</span> <span class="cn">FALSE</span>, cellwidth <span class="op">=</span> <span class="fl">10</span>, cellheight <span class="op">=</span> <span class="fl">10</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/visualize_interaction_network.html">visualize_interaction_network</a></span><span class="op">(</span><span class="va">intx</span><span class="op">$</span><span class="va">network</span><span class="op">)</span></span></code></pre></div>
+<p><img src="08_interaction_heatmap.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
+<p><img src="11_cell_interaction_network.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
-<h2 id="neighborhood-clustering">5.Neighborhood Clustering<a class="anchor" aria-label="anchor" href="#neighborhood-clustering"></a>
+<h2 id="spatial-network-graph-real-edges">Spatial network graph (real edges)<a class="anchor" aria-label="anchor" href="#spatial-network-graph-real-edges"></a>
 </h2>
+<p>Points are opaque with a white halo so colors remain clear over edges. For overview plots use <code>edge_mode = "top"</code>; for local zoom, shrink <code>zoom_radius</code> and downsample edges with <code>edge_mode = "random"</code> so structure stays readable.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Cluster neighborhoods based on spatial features</span></span>
-<span><span class="va">clustered_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cluster_neighborhoods.html">cluster_neighborhoods</a></span><span class="op">(</span></span>
-<span>  feature_df <span class="op">=</span> <span class="va">feature_df</span>,</span>
-<span>  spatial_edges <span class="op">=</span> <span class="va">spatial_edges</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"kmeans"</span>,</span>
-<span>  k <span class="op">=</span> <span class="fl">12</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Identified "</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">clustered_df</span><span class="op">$</span><span class="va">Neighborhood_Cluster</span><span class="op">)</span><span class="op">)</span>, <span class="st">" neighborhood clusters"</span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="neighborhood-clusters">Neighborhood Clusters<a class="anchor" aria-label="anchor" href="#neighborhood-clusters"></a>
-</h3>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_spatial_distribution.html">visualize_spatial_distribution</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  x_col <span class="op">=</span> <span class="st">"X"</span>, </span>
-<span>  y_col <span class="op">=</span> <span class="st">"Y"</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"Neighborhood_Cluster"</span>,</span>
-<span>  point_size <span class="op">=</span> <span class="fl">1.5</span>,</span>
-<span>  point_alpha <span class="op">=</span> <span class="fl">0.6</span>,</span>
-<span>  title <span class="op">=</span> <span class="st">"Neighborhood Clusters"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="05_spatial_distribution_clusters.jpg" width="700"></p>
-</div>
-<div class="section level3">
-<h3 id="cluster-composition">Cluster Composition<a class="anchor" aria-label="anchor" href="#cluster-composition"></a>
-</h3>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Calculate cluster composition</span></span>
-<span><span class="va">comp_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_cluster_composition.html">calculate_cluster_composition</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  cluster_col <span class="op">=</span> <span class="st">"Neighborhood_Cluster"</span>, </span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Plot composition bar plot</span></span>
-<span><span class="fu"><a href="../reference/plot_composition_barplot.html">plot_composition_barplot</a></span><span class="op">(</span></span>
-<span>  <span class="va">comp_df</span>,</span>
-<span>  cluster_col <span class="op">=</span> <span class="st">"Neighborhood_Cluster"</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span>, </span>
-<span>  value_col <span class="op">=</span> <span class="st">"proportion"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="07_cluster_composition_barplot.jpg" width="700"></p>
-</div>
-<div class="section level3">
-<h3 id="voronoi-diagram">Voronoi Diagram<a class="anchor" aria-label="anchor" href="#voronoi-diagram"></a>
-</h3>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_voronoi.html">visualize_voronoi</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  coloring <span class="op">=</span> <span class="st">"neighborhood"</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span>,</span>
-<span>  neighborhood_col <span class="op">=</span> <span class="st">"Neighborhood_Cluster"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="12_voronoi_neighborhood.png" width="700"></p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="spatial-interaction-analysis">6.Spatial Interaction Analysis<a class="anchor" aria-label="anchor" href="#spatial-interaction-analysis"></a>
-</h2>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Analyze cell-cell spatial interactions</span></span>
-<span><span class="va">interaction_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/analyze_spatial_interactions.html">analyze_spatial_interactions</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  <span class="va">spatial_edges</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="cell-cell-interactions">Cell-Cell Interactions<a class="anchor" aria-label="anchor" href="#cell-cell-interactions"></a>
-</h3>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_interaction_heatmap.html">visualize_interaction_heatmap</a></span><span class="op">(</span></span>
-<span>  <span class="va">interaction_results</span><span class="op">$</span><span class="va">interaction_matrix</span>, </span>
-<span>  transform <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="08_interaction_heatmap.jpg" width="700"></p>
-</div>
-<div class="section level3">
-<h3 id="spatial-network-visualization">Spatial Network Visualization<a class="anchor" aria-label="anchor" href="#spatial-network-visualization"></a>
-</h3>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_spatial_network.html">visualize_spatial_network</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  <span class="va">spatial_edges</span>,</span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span>,</span>
-<span>  x_col <span class="op">=</span> <span class="st">"X"</span>,</span>
-<span>  y_col <span class="op">=</span> <span class="st">"Y"</span>, </span>
-<span>  edge_mode <span class="op">=</span> <span class="st">"top"</span>,</span>
-<span>  top_n <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  point_size <span class="op">=</span> <span class="fl">0.01</span>,</span>
-<span>  point_alpha <span class="op">=</span> <span class="fl">0.7</span>,</span>
-<span>  edge_size_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>  edge_alpha_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">0.9</span><span class="op">)</span>,</span>
-<span>  edge_color <span class="op">=</span> <span class="st">"black"</span></span>
+<span>  <span class="va">clus</span>, <span class="va">edges</span>, edge_mode <span class="op">=</span> <span class="st">"top"</span>, top_n <span class="op">=</span> <span class="fl">1200</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fl">0.5</span>, point_alpha <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">cx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">clus</span><span class="op">$</span><span class="va">X</span><span class="op">)</span><span class="op">)</span>; <span class="va">cy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">clus</span><span class="op">$</span><span class="va">Y</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">zr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">clus</span><span class="op">$</span><span class="va">X</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">clus</span><span class="op">$</span><span class="va">Y</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fl">0.07</span></span>
+<span><span class="fu"><a href="../reference/visualize_spatial_network.html">visualize_spatial_network</a></span><span class="op">(</span></span>
+<span>  <span class="va">clus</span>, <span class="va">edges</span>,</span>
+<span>  edge_mode <span class="op">=</span> <span class="st">"random"</span>, max_edges <span class="op">=</span> <span class="fl">180</span>,</span>
+<span>  zoom_center <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">cx</span>, <span class="va">cy</span><span class="op">)</span>, zoom_radius <span class="op">=</span> <span class="va">zr</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fl">2.2</span>, point_alpha <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  title <span class="op">=</span> <span class="st">"Spatial network (local zoom)"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="10_spatial_network.jpg" width="700"></p>
-</div>
-<div class="section level3">
-<h3 id="interaction-network-graph">Interaction Network Graph<a class="anchor" aria-label="anchor" href="#interaction-network-graph"></a>
-</h3>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_interaction_network.html">visualize_interaction_network</a></span><span class="op">(</span></span>
-<span>  <span class="va">interaction_results</span><span class="op">$</span><span class="va">network</span>,</span>
-<span>  node_size_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span><span class="op">)</span>,</span>
-<span>  edge_size_range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>  label_size <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  show_labels <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  max_nodes <span class="op">=</span> <span class="fl">50</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p><img src="11_cell_interaction_network.jpg" width="700"></p>
-</div>
+<p><img src="10_spatial_network.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
+<p><img src="10_spatial_network_zoom.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
-<h2 id="neighborhood-purity-analysis">7.Neighborhood Purity Analysis<a class="anchor" aria-label="anchor" href="#neighborhood-purity-analysis"></a>
+<h2 id="voronoi-view">Voronoi view<a class="anchor" aria-label="anchor" href="#voronoi-view"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Calculate neighborhood purity using radius method</span></span>
-<span><span class="va">neighborhood_purity</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/calculate_neighborhood_purity.html">calculate_neighborhood_purity</a></span><span class="op">(</span></span>
-<span>  <span class="va">clustered_df</span>,</span>
-<span>  x_col <span class="op">=</span> <span class="st">"X"</span>,</span>
-<span>  y_col <span class="op">=</span> <span class="st">"Y"</span>, </span>
-<span>  celltype_col <span class="op">=</span> <span class="st">"celltype"</span>,</span>
-<span>  method <span class="op">=</span> <span class="st">"radius"</span>,</span>
-<span>  radius <span class="op">=</span> <span class="fl">16.8</span>,</span>
-<span>  min_cells <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="neighborhood-purity-graph">Neighborhood Purity Graph<a class="anchor" aria-label="anchor" href="#neighborhood-purity-graph"></a>
-</h3>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_neighborhood_purity.html">visualize_neighborhood_purity</a></span><span class="op">(</span></span>
-<span>    <span class="va">neighborhood_purity</span>,</span>
-<span>    x_col <span class="op">=</span> <span class="st">"X"</span>,</span>
-<span>    y_col <span class="op">=</span> <span class="st">"Y"</span>,</span>
-<span>    celltype_col <span class="op">=</span> <span class="st">"celltype"</span>,</span>
-<span>    <span class="co"># max_points = 1000,</span></span>
-<span>    point_size <span class="op">=</span> <span class="fl">1.0</span>,</span>
-<span>    point_alpha <span class="op">=</span> <span class="fl">0.8</span>,</span>
-<span>    title <span class="op">=</span> <span class="st">"Neighborhood Purity"</span></span>
-<span>  <span class="op">)</span></span></code></pre></div>
-<p><img src="04_neighborhood_purity.jpg" width="700"></p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/visualize_voronoi.html">visualize_voronoi</a></span><span class="op">(</span><span class="va">clus</span>, coloring <span class="op">=</span> <span class="st">"neighborhood"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="12_voronoi_neighborhood.png" class="r-plt" width="92%" style="display: block; margin: auto;"></p>
 </div>
+<div class="section level2">
+<h2 id="next-step">Next step<a class="anchor" aria-label="anchor" href="#next-step"></a>
+</h2>
+<p><code><a href="../articles/functional.html">vignette("functional", package = "Sphinx")</a></code></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -311,7 +207,7 @@ analysis using Sphinx package.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

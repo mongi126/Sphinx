@@ -1,103 +1,77 @@
 # Data Preprocessing
 
-This tutorial demonstrates the complete data preprocessing workflow for
-spatial proteomics data using Sphinx.
+## Overview
 
-## Load Required Packages
+This module prepares spatial proteomics inputs (CODEX / CyCIF / MIBI
+tables or Seurat objects): QC filtering, normalization, dimensionality
+reduction, and clustering.
+
+Examples use **reg055\_A** (CODEX CRC, Schurch *et al.* 2020).
+
+## Load packages
 
 ``` r
-
 library(Sphinx)
 library(Seurat)
+library(dplyr)
 library(ggplot2)
-library(patchwork)
 ```
 
-## 1. Load Spatial Data
+## Load spatial data
 
 ``` r
-
-# Load spatial data from CSV file
-obj <- load_spatial_data(filename = "TSU-33_FF_measurements_mod.csv")
-
-# Check basic object information
-print(obj)
+obj <- load_spatial_data(filename = "reg055_A_counts_with_coords.csv")
+# Or construct a Seurat object from an expression matrix plus X / Y metadata.
 ```
 
-## 2. Quality Control Filtering
+## QC filtering
 
 ``` r
-
-# Filter low-quality cells using MAD-based thresholds
-obj_filtered <- filter_data(
-  obj,
-  nCount_mad_threshold = 5,        # More stringent MAD threshold
-  nFeature_quantile_threshold = 0.05  # Remove bottom 5% of cells by feature count
-)
-
-# Report filtering statistics
-message("Initial cells: ", ncol(obj))
-message("After filtering: ", ncol(obj_filtered))
-message("Cells removed: ", ncol(obj) - ncol(obj_filtered))
+obj_filtered <- filter_data(obj, nFeature_quantile_threshold = 0.05)
 ```
 
-## 3. Data Processing
+## Normalize, PCA, cluster
 
 ``` r
-
-# Process data with dimensionality reduction and clustering
-obj_processed <- process_data(
-  obj_filtered,
-  dims = 1:10,        # PCA dimensions to use
-  resolution = 0.5    # Clustering resolution
-)
-
-# Check processing results
-print(obj_processed)
+obj_processed <- process_data(obj_filtered, dims = 1:15, resolution = 0.5)
 ```
 
-## 4. Determine Optimal Dimensions
+## Elbow plot
 
 ``` r
-
-# Generate elbow plot to determine optimal PCA dimensions
-plot_elbow(obj_processed, "elbow_plot.png")
+plot_elbow(obj_processed, save_path = "elbow_plot.png")
 ```
 
 ![](elbow_plot.png)
 
-*Elbow plot showing explained variance by PCA components. The “elbow”
-indicates optimal number of dimensions.*
-
-## 5. Extract Spatial Coordinates
+## Extract spatial coordinates
 
 ``` r
-
-# Extract and verify spatial coordinates
 obj_processed <- extract_spatial_coordinates(obj_processed)
-
-# Check coordinate extraction
-head(obj_processed@meta.data[, c("X", "Y")])
 ```
 
-## 6. Visualize Results
+## Quick cluster views
 
 ``` r
-
-# Generate comprehensive visualizations
-plots <- visualize_results(obj_processed, save_dir = "./results/")
+plots <- visualize_results(obj_processed, save_dir = "preprocess_plots/")
+# plots$umap_plot, plots$spatial_plot
 ```
 
-### Cluster UMAP Visualization
+![](cluster_umap.png)
 
-![](codex_umap.jpg)
+![](spatial_clusters.png)
 
-*UMAP visualization showing cell clusters in reduced dimensional space.*
+`visualize_results()` writes a cluster UMAP and a spatial map of cluster
+IDs using the package color palette.
 
-## 7. Save Processed Data
+## Save
 
 ``` r
-
-# Save processed object for downstream analysis 
-saveRDS(obj_processed, "tsu33_processed.rds")
+saveRDS(obj_processed, "reg055_A_processed.rds")
 ```
+
+## Next step
+
+`vignette("annotation", package = "Sphinx")`, or jump to spatial
+networks if labels are ready: `vignette("spatial-network", package =
+"Sphinx")`.

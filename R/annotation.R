@@ -2,14 +2,18 @@
 
 #' Custom color palette for cell type visualizations
 #'
-#' A predefined vector of 36 distinct colors for consistent cell type coloring
+#' Distinct candy qualitative colors (one hue family per color) used as a
+#' fallback palette for annotation plots.
+#'
+#' @format A character vector of hex color codes.
+#' @export
 celltype_colors <- c(
-  "#E5D2DD", "#53A85F", "#F1BB72", "#F3B1A0", "#D6E7A3", "#57C3F3",
-  "#476D87", "#E95C59", "#E59CC4", "#AB3282", "#23452F", "#BD956A",
-  "#8C549C", "#585658", "#9FA3A8", "#E0D4CA", "#5F3D69", "#C5DEBA",
-  "#58A4C3", "#E4C755", "#F7F398", "#AA9A59", "#E63863", "#E39A35",
-  "#C1E6F3", "#6778AE", "#91D0BE", "#B53E2B", "#712820", "#DCC1DD",
-  "#CCE0F5", "#CCC9E6", "#625D9E", "#68A180", "#3A6963", "#968175"
+  "#E05C6E", "#4EA8DE", "#E8C04A", "#4CB87A", "#8B6BC9", "#E8884A",
+  "#3DB8A0", "#C45BA0", "#A67C52", "#5B7FD6", "#A8C75A", "#6B7C85",
+  "#D4A017", "#2E8B57", "#E76F51", "#45A8D0", "#9B59B6", "#1ABC9C",
+  "#3498DB", "#F39C12", "#E74C3C", "#2980B9", "#27AE60", "#8E44AD",
+  "#D35400", "#16A085", "#C0392B", "#2C3E50", "#7F8C8D", "#E67E22",
+  "#1F618D", "#196F3D", "#6C3483", "#922B21", "#B9770E", "#0E6655"
 )
 
 #' Identify top marker proteins for cell clusters
@@ -137,15 +141,22 @@ plot_marker_violin <- function(seurat_obj,
   }
 
   # Create violin plots showing expression distributions
-  p <- Seurat::VlnPlot(
+  # combine=FALSE avoids Seurat/patchwork theme incompatibilities with multi-feature layouts
+  plots <- Seurat::VlnPlot(
     object = seurat_obj,
     features = markers,      # Proteins to visualize
     group.by = group_by,     # Grouping variable (clusters)
     assay = assay,           # Expression data source
     pt.size = 0,             # Hide individual points
-    ncol = ncol              # Multi-plot layout
-  ) +
-    ggplot2::theme(legend.position = "none")  # Remove legend
+    ncol = ncol,             # Multi-plot layout
+    combine = FALSE
+  )
+  plots <- lapply(plots, function(x) x + ggplot2::theme(legend.position = "none"))
+  p <- if (length(plots) == 1L) {
+    plots[[1]]
+  } else {
+    patchwork::wrap_plots(plots, ncol = ncol)
+  }
 
   # Save composite plot to PDF
   ggplot2::ggsave(save_path, plot = p, width = width, height = height)
@@ -338,18 +349,21 @@ plot_annotated_umap <- function(seurat_obj,
   }
 
   # Get unique cell types for color assignment
-  unique_celltypes <- unique(na.omit(seurat_obj@meta.data$celltype))
+  unique_celltypes <- unique(na.omit(as.character(seurat_obj@meta.data$celltype)))
+  ct_cols <- assign_celltype_colors(unique_celltypes)
+  ct_levels <- sort(unique_celltypes)
+  seurat_obj$celltype <- factor(seurat_obj$celltype, levels = ct_levels)
 
   # Create UMAP plot with cell type coloring
   p <- Seurat::DimPlot(
     object = seurat_obj,
     reduction = "umap",
-    cols = celltype_colors[1:length(unique_celltypes)],  # Use appropriate number of colors
-    pt.size = 0.5,           # Point size optimization
+    cols = unname(ct_cols[ct_levels]),
+    pt.size = 0.5,
     group.by = "celltype"
     ) +
-    ggplot2::theme(aspect.ratio = 1) +  # Maintain aspect ratio
-    ggplot2::theme(plot.title = ggplot2::element_blank())  # Remove default title
+    ggplot2::theme(aspect.ratio = 1) +
+    ggplot2::theme(plot.title = ggplot2::element_blank())
 
   # Save visualization to PDF
   ggplot2::ggsave(save_path, plot = p, width = width, height = height)
@@ -398,24 +412,30 @@ plot_spatial_distribution <- function(seurat_obj,
     stop("Cell type annotations not found - run annotate_celltypes() first")
   }
 
-  # Get unique cell types for color assignment
+  # Get unique cell types for color assignment (stable mapping)
   unique_celltypes <- unique(na.omit(seurat_obj@meta.data$celltype))
+  ct_cols <- assign_celltype_colors(unique_celltypes)
 
-  # Create spatial distribution plot
+  # Create spatial distribution plot (no internal grid; SCI-sized fonts)
   p <- ggplot2::ggplot(seurat_obj@meta.data, ggplot2::aes(x = X, y = Y)) +
     ggplot2::geom_point(ggplot2::aes(color = celltype), size = point.size, alpha = 0.8) +
-    ggplot2::theme_classic() +
+    ggplot2::theme_classic(base_size = 14) +
     ggplot2::scale_color_manual(
-      values = celltype_colors[1:length(unique_celltypes)],
+      values = ct_cols,
       name = "Cell Type"
     ) +
     ggplot2::coord_fixed() +  # Maintain spatial aspect ratio
     ggplot2::labs(x = "X (um)", y = "Y (um)", title = "Spatial Cell Type Annotation") +
     ggplot2::theme(
-      legend.text = ggplot2::element_text(size = 14),        # Increase legend text size
-      legend.title = ggplot2::element_text(size = 16)         # Increase legend title size
+      panel.grid = ggplot2::element_blank(),
+      plot.title = ggplot2::element_text(face = "plain", size = 18, hjust = 0.5),
+      axis.title = ggplot2::element_text(face = "plain", size = 15),
+      axis.text = ggplot2::element_text(face = "plain", size = 13, colour = "black"),
+      legend.text = ggplot2::element_text(size = 14, face = "plain"),
+      legend.title = ggplot2::element_text(size = 16, face = "plain"),
+      panel.border = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8)
     ) +
-    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 2)))  # Increase legend point size
+    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 3, shape = 16)))
 
   # Save spatial plot to PDF
   ggplot2::ggsave(save_path, plot = p, width = width, height = height)
@@ -497,7 +517,7 @@ plot_spatial_markers <- function(obj,
       ggplot2::theme_void() +
       ggplot2::theme(
         legend.position = "right",
-        plot.title = ggplot2::element_text(hjust = 0.5, size = 14, face = "bold")
+        plot.title = ggplot2::element_text(hjust = 0.5, size = 14, face = "plain")
       ) +
       ggplot2::coord_fixed() +
       ggplot2::labs(title = title, color = "Expression")
@@ -530,7 +550,7 @@ plot_spatial_markers <- function(obj,
     patchwork::plot_annotation(
       title = paste0("Spatial Marker Expression (", assay, ")"),
       theme = ggplot2::theme(
-        plot.title = ggplot2::element_text(hjust = 0.5, size = 16, face = "bold")
+        plot.title = ggplot2::element_text(hjust = 0.5, size = 16, face = "plain")
       )
     )
 
@@ -634,7 +654,7 @@ plot_umap_markers <- function(seurat_obj,
       ggplot2::ggtitle(marker) +
       ggplot2::theme(
         legend.position = "right",
-        plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 12)
+        plot.title = ggplot2::element_text(hjust = 0.5, face = "plain", size = 12)
       )
   })
 
@@ -645,7 +665,7 @@ plot_umap_markers <- function(seurat_obj,
     patchwork::plot_annotation(
       title = "UMAP Marker Expression Map",
       theme = ggplot2::theme(
-        plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 16)
+        plot.title = ggplot2::element_text(hjust = 0.5, face = "plain", size = 16)
       )
     )
 

@@ -5,12 +5,13 @@
 \alias{celltype_colors}
 \title{Custom color palette for cell type visualizations}
 \format{
-An object of class \code{character} of length 36.
+A character vector of hex color codes.
 }
 \usage{
 celltype_colors
 }
 \description{
-A predefined vector of 36 distinct colors for consistent cell type coloring
+Distinct candy qualitative colors (one hue family per color) used as a
+fallback palette for annotation plots.
 }
 \keyword{datasets}

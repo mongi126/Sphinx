@@ -1,3 +1,22 @@
+# R / RStudio
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+R/.Rhistory
+*.Rproj.user
+
+# Build artifacts & debug
+*.log
+debug_*.R
+debug-*.log
+verify_*.R
+Rplots.pdf
 /doc/
 /Meta/
-docs
+/build/
+/tools/
+.cursor/
+
+# OS
+.DS_Store

@@ -12,7 +12,9 @@ perform_cluster_enrichment(
   custom_databases = NULL,
   pvalueCutoff = 0.05,
   mean_diff_cutoff = 0,
-  use_adj_pvalue = TRUE
+  use_adj_pvalue = TRUE,
+  background = NULL,
+  include_overlap = TRUE
 )
 }
 \arguments{
@@ -31,6 +33,14 @@ perform_cluster_enrichment(
 \item{mean_diff_cutoff}{Minimum mean difference, Target - Control (default: 0)}
 
 \item{use_adj_pvalue}{Whether to use adjusted p-values (default: TRUE)}
+
+\item{background}{Character vector of background gene symbols. If NULL
+(default), uses all unique proteins in \code{diff_results} (recommended for
+targeted protein panels). Genome-wide EnrichR defaults are inappropriate
+when only a small panel was assayed.}
+
+\item{include_overlap}{logical; pass to enrichR when using background
+(default: TRUE)}
 }
 \value{
 Data frame with enrichment results

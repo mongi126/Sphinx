@@ -4,19 +4,38 @@
 \alias{perform_differential_expression}
 \title{Perform differential expression analysis}
 \usage{
-perform_differential_expression(protein_df)
+perform_differential_expression(
+  protein_df,
+  test_level = c("spatial_block", "cell"),
+  block_size = NULL,
+  min_blocks = 3L
+)
 }
 \arguments{
 \item{protein_df}{Data frame with protein expression and cluster information}
+
+\item{test_level}{\code{"spatial_block"} (default) or \code{"cell"} (legacy; not
+recommended due to pseudo-replication)}
+
+\item{block_size}{numeric grid side length for spatial blocks. NULL = auto.}
+
+\item{min_blocks}{minimum number of Target and Control blocks required
+(default: 3)}
 }
 \value{
 Data frame with columns Mean_Target, Mean_Control, MeanDiff, p.value,
-adj.p.value, and Significance
+adj.p.value, Significance, and \code{n_target} / \code{n_control} (cells or blocks)
 }
 \description{
 Compares each neighborhood cluster to all other cells. For CLR-normalized
 protein values, reports mean difference (Target - Control) rather than
 log2 fold change to avoid redundant log transforms.
+}
+\details{
+By default, tests are run on \strong{spatial-block means} rather than individual
+cells. Treating every cell as an independent observation overstates degrees
+of freedom because nearby cells are spatially correlated (pseudo-replication).
+Aggregating to tissue blocks reduces that inflation.
 }
 \examples{
 df <- Sphinx:::.sphinx_example_protein_df(40)

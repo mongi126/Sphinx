@@ -2,7 +2,7 @@
 
 Assigns biological cell type annotations to clusters:
 
-1.  Validates equal length of cluster_ids and celltype_labels
+1.  Validates equal length of cluster\_ids and celltype\_labels
 
 2.  Creates cluster-to-celltype mapping
 
@@ -23,22 +23,33 @@ annotate_celltypes(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with cluster assignments
 
-  Seurat object with cluster assignments
+  - cluster\_ids:
+    
+    Vector of cluster IDs to annotate
 
-- cluster_ids:
+  - celltype\_labels:
+    
+    Vector of cell type labels corresponding to cluster\_ids
 
-  Vector of cluster IDs to annotate
-
-- celltype_labels:
-
-  Vector of cell type labels corresponding to cluster_ids
-
-- cluster_column:
-
-  Metadata column containing cluster IDs (default: "seurat_clusters")
+  - cluster\_column:
+    
+    Metadata column containing cluster IDs (default: "seurat\_clusters")
 
 ## Value
 
 Seurat object with added "celltype" metadata
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(20)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+table(obj@meta.data$celltype)
+# }
+```

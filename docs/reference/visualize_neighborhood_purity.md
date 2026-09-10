@@ -11,10 +11,11 @@ visualize_neighborhood_purity(
   y_col = "Y",
   max_points = 10000,
   point_size = 1.5,
-  point_alpha = 0.8,
+  point_alpha = 0.9,
   point_shape = 16,
   title = NULL,
   legend.position = "right",
+  base_size = 14,
   save_path = NULL,
   width = 10,
   height = 8
@@ -23,54 +24,69 @@ visualize_neighborhood_purity(
 
 ## Arguments
 
-- df:
+  - df:
+    
+    Spatial data with Neighborhood\_Purity column
 
-  Spatial data with Neighborhood_Purity column
+  - x\_col:
+    
+    X coordinate column name (default: "X")
 
-- x_col:
+  - y\_col:
+    
+    Y coordinate column name (default: "Y")
 
-  X coordinate column name (default: "X")
+  - max\_points:
+    
+    Maximum points to plot (default: 10000)
 
-- y_col:
+  - point\_size:
+    
+    Point size (default: 1.5)
 
-  Y coordinate column name (default: "Y")
+  - point\_alpha:
+    
+    Point transparency (default: 0.8)
 
-- max_points:
+  - point\_shape:
+    
+    Point shape (default: 16)
 
-  Maximum points to plot (default: 10000)
+  - title:
+    
+    Plot title
 
-- point_size:
+  - legend.position:
+    
+    Legend position (default: "right")
 
-  Point size (default: 1.5)
+  - base\_size:
+    
+    Base font size in points (default: 14; minimum 8)
 
-- point_alpha:
+  - save\_path:
+    
+    Output file path (optional)
 
-  Point transparency (default: 0.8)
+  - width:
+    
+    Plot width in inches (default: 10)
 
-- point_shape:
-
-  Point shape (default: 16)
-
-- title:
-
-  Plot title
-
-- legend.position:
-
-  Legend position (default: "right")
-
-- save_path:
-
-  Output file path (optional)
-
-- width:
-
-  Plot width in inches (default: 10)
-
-- height:
-
-  Plot height in inches (default: 8)
+  - height:
+    
+    Plot height in inches (default: 8)
 
 ## Value
 
-ggplot object and saves plot to file if save_path provided
+ggplot object and saves plot to file if save\_path provided
+
+## Examples
+
+``` r
+# \donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+df <- calculate_neighborhood_purity(df, method = "knn", n_neighbors = 5, verbose = FALSE)
+p <- visualize_neighborhood_purity(df, save_path = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

@@ -1,128 +1,80 @@
 # Functional Analysis
 
-This tutorial demonstrates how to perform functional enrichment analysis
-on spatially defined neighborhoods to identify biological pathways and
-processes.
+## Overview
 
-## Load Required Packages
+This module connects neighborhood structure to protein programs:
+differential testing (spatial-block aware by default), volcano plots
+with a capped y-axis, and enrichment summaries.
+
+**Demo:** reg055\_A panel expression with neighborhood clusters from the
+spatial-network tutorial.
+
+## Prepare protein table
 
 ``` r
-
 library(Sphinx)
-library(ComplexHeatmap)
-library(clusterProfiler)
-library(org.Hs.eg.db)
-library(ggplot2)
-library(ggrepel)
 library(dplyr)
-library(enrichR)
-library(patchwork)
+
+protein_df <- prepare_protein_data(clus, expr_df)
 ```
 
-## 1. Load Data
+## Differential expression
 
 ``` r
-
-# Load neighborhood clustering results
-df <- read.csv("results.csv")
-
-# Load protein expression data
-protein <- read.csv("../tsu33_expression_filtered.csv", 
-                   check.names = FALSE, 
-                   row.names = 1)
-
-# Check data dimensions
-message("Neighborhood data: ", nrow(df), " cells")
-message("Protein data: ", nrow(protein), " proteins x ", ncol(protein), " cells")
+diff_res <- perform_differential_expression(
+  protein_df,
+  test_level = "spatial_block"
+)
 ```
 
-## 2. Prepare Protein Data
+## Volcano plots
+
+`-log10(adjusted P)` is capped at `y_cap` (default **50**). Points above
+the cap are drawn as triangles on the truncation line.
 
 ``` r
-
-# Merge neighborhood clusters with protein expression
-protein_df <- prepare_protein_data(df, protein)
-
-# Check merged data structure
-message("Merged data dimensions: ", paste(dim(protein_df), collapse = " x "))
-message("NA values in key proteins: ", sum(is.na(protein_df$PD.1)))
-```
-
-## 3. Differential Expression Analysis
-
-``` r
-
-# Perform differential expression between neighborhoods
-diff_results <- perform_differential_expression(protein_df)
-
-# Save results
-write.csv(diff_results, "diff_results.csv")
-
-# View summary statistics
-summary(diff_results$Log2FC)
-table(diff_results$Significance)
-```
-
-## 4. Volcano Plot Visualization
-
-``` r
-
-# Generate volcano plots for all clusters
-volcano_all <- plot_volcano_all_clusters(diff_results)
-
-# Adjust aspect ratio and save
-volcano_all <- volcano_all + theme(aspect.ratio = 0.75)
-ggsave("VolcanoPlots_AllClusters.pdf", volcano_all, width = 10, height = 20)
+plot_volcano_all_clusters(
+  diff_res,
+  diff_thresh = 0.15,
+  p_thresh = 0.05,
+  y_cap = 50,
+  ncol = 3,
+  save_plot = TRUE,
+  output_dir = "functional_plots",
+  filename = "VolcanoPlots_AllClusters"
+)
 ```
 
 ![](VolcanoPlots_AllClusters.png)
 
-## 5. Functional Enrichment Analysis
+## Enrichment
 
 ``` r
-
-# Perform enrichment analysis using human databases
-cluster_enrich <- perform_cluster_enrichment(
-  diff_results, 
-  species = "human"
+enrich <- perform_cluster_enrichment(
+  diff_res,
+  species = "human",
+  pvalueCutoff = 0.05,
+  mean_diff_cutoff = 0
 )
 
-# Save enrichment results
-saveRDS(cluster_enrich, "cluster_enrich.rds")
-
-# View enrichment summary
-message("Enriched terms found: ", nrow(cluster_enrich))
-message("Clusters with enrichment: ", length(unique(cluster_enrich$Cluster)))
-```
-
-**Enrichment Databases:** - GO Biological Processes - GO Molecular
-Functions - KEGG Pathways - Reactome Pathways - CORUM Complexes
-
-## 6. Visualize Enrichment Results
-
-``` r
-
-# Generate publication-quality enrichment plots
 plots <- plot_enrichment_results(
-  cluster_enrich,
-  top_n = 5,                   # Top 5 terms per cluster
-  fdr_cutoff = 0.05,           # FDR threshold
-  term_trunc_length = 40,      # Term name length
-  base_font_size = 7,          # Font size
-  plot_types = "bar",          # Plot type (bar, heatmap, dot)
-  save_plot = TRUE             # Save plots automatically
+  enrich,
+  top_n = 5,
+  fdr_cutoff = 0.05,
+  base_font_size = 12,
+  save_plot = TRUE,
+  output_dir = "enrichment_plots"
 )
-
-# Access individual plots
-bar_plot <- plots$bar_plot
-heatmap_plot <- plots$heatmap
-dot_plot <- plots$dot_plot
 ```
 
-### Enrichment Bar Plot
+![](bar_plot.png)
 
-![](bar_plot.jpg)
+![](bubble_plot.png)
 
-### Enrichment bubble plot
+## Tips for targeted CODEX panels
 
-![](bubble_plot.jpg)
+  - Prefer the assayed protein list as EnrichR `background` (Sphinx
+    default).
+  - Use `test_level = "spatial_block"` for tissue DE.
+  - Plotting helpers still work offline on any table with `Cluster`,
+    `Term`, `FDR`, and `GenesN`.

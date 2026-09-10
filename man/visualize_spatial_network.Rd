@@ -13,13 +13,19 @@ visualize_spatial_network(
   edge_mode = c("all", "top", "random"),
   top_n = 1000,
   max_edges = 1000,
+  xlim = NULL,
+  ylim = NULL,
+  zoom_center = NULL,
+  zoom_radius = NULL,
   point_size = 1.5,
-  point_alpha = 0.7,
+  point_alpha = 1,
   edge_size_range = c(0.3, 2),
-  edge_alpha_range = c(0.3, 0.9),
-  edge_color = "darkred",
+  edge_alpha_range = c(0.15, 0.45),
+  edge_color = "grey35",
   show_points = TRUE,
   legend_point_size = 3,
+  base_size = 14,
+  title = NULL,
   save_path = NULL,
   width = 12,
   height = 10
@@ -42,19 +48,31 @@ visualize_spatial_network(
 
 \item{max_edges}{When edge_mode = "random", sample this many edges (default: 1000)}
 
+\item{xlim}{Optional x-axis limits for local zoom, e.g. \code{c(xmin, xmax)}}
+
+\item{ylim}{Optional y-axis limits for local zoom, e.g. \code{c(ymin, ymax)}}
+
+\item{zoom_center}{Optional center \code{c(x, y)} for circular/rectangular zoom}
+
+\item{zoom_radius}{Half-width of zoom window around \code{zoom_center} (same units as coords)}
+
 \item{point_size}{Point size (default: 1.5)}
 
-\item{point_alpha}{Point transparency (default: 0.7)}
+\item{point_alpha}{Point transparency (default: 1; keep opaque so cell-type colors stay clear over edges)}
 
 \item{edge_size_range}{Edge size range (default: c(0.3, 2.0))}
 
 \item{edge_alpha_range}{Edge alpha range (default: c(0.3, 0.9))}
 
-\item{edge_color}{Edge color (default: "darkred")}
+\item{edge_color}{Edge color (default: "grey35")}
 
 \item{show_points}{Whether to show points (default: TRUE)}
 
 \item{legend_point_size}{Legend point size (default: 3)}
+
+\item{base_size}{Base font size (default: 14)}
+
+\item{title}{Plot title}
 
 \item{save_path}{Output file path (optional)}
 
@@ -66,13 +84,18 @@ visualize_spatial_network(
 ggplot object and saves plot to file if save_path provided
 }
 \description{
-Visualize spatial network with flexible edge selection
+Draws \strong{real pairwise cell-cell edges} using spatial coordinates. Supports
+local zoom via \code{xlim}/\code{ylim} or \code{zoom_center} + \code{zoom_radius}. When zooming,
+edges with both endpoints inside the window are kept so local connectivity
+is shown faithfully.
 }
 \examples{
 \donttest{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 p <- visualize_spatial_network(df, edges, save_path = tempfile(fileext = ".pdf"))
+# Local zoom around tissue center:
+# visualize_spatial_network(df, edges, zoom_center = c(500, 500), zoom_radius = 80)
 class(p)
 }
 }

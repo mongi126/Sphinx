@@ -2,123 +2,95 @@
 
 ## Overview
 
-**Sphinx** is an R package for **spatial proteomics analysis**. It
-provides an end-to-end workflow built on
-[Seurat](https://satijalab.org/seurat/) for:
+**Sphinx** is an R toolkit for **spatial proteomics**. It organizes
+common analysis steps into four focused modules that you can use
+together or independently:
 
-- Data preprocessing and quality control
-- Cell-type annotation and marker discovery
-- Spatial neighborhood modeling and interaction analysis
-- Functional enrichment and publication-ready visualization
+  - Preprocessing and quality control
+  - Marker discovery and cell-type annotation
+  - Spatial neighborhood graphs and interaction analysis
+  - Differential proteins, enrichment, and publication-ready figures
 
-Sphinx supports common spatial proteomics platforms (e.g., CODEX, CyCIF,
-IMC) and accepts tabular count matrices with spatial coordinates.
+Tutorials use **reg055\_A** from the public CODEX colorectal carcinoma
+cohort of Schurch *et al.*, *Cell* (2020)
+([data](https://data.mendeley.com/datasets/mpjzbtfgfr/1)): \~3.9k cells
+and 58 proteins, with published `ClusterName` labels that we map onto
+reclustered identities for the worked examples.
+
+![](workflow.png)
 
 ## Installation
 
-Install the development version from GitHub (see
-[`vignette("installation", package = "Sphinx")`](https://mongi126.github.io/Sphinx/articles/installation.md)
-for details):
-
 ``` r
-
-devtools::install_github("mongi126/Sphinx")
+# remotes::install_github("mongi126/Sphinx")
+# or: install.packages("Sphinx_1.0.1.tar.gz", repos = NULL, type = "source")
 library(Sphinx)
 packageVersion("Sphinx")
 ```
 
+See `vignette("installation", package = "Sphinx")` for details.
+
 ## Quick start
 
-The typical analysis pipeline follows four sequential modules. Each step
-produces a Seurat object that feeds into the next:
+With a table of `Cell_ID`, `X`, `Y`, and `celltype`:
 
 ``` r
-
 library(Sphinx)
-library(Seurat)
+library(data.table)
 
-# 1. Preprocessing
-obj <- load_spatial_data("your_data.csv")
-obj <- filter_data(obj)
-obj <- process_data(obj)
+df <- prepare_data(meta, cell_id_col = "Cell_ID", celltype_col = "celltype")
 
-# 2. Cell annotation
-markers <- find_top_markers(obj)
-obj     <- annotate_celltypes(obj, markers)
+dist_result <- calculate_celltype_distances(df)
+edges <- build_spatial_network(df, method = "auto")
+feat <- calculate_neighborhood_features(df, edges)
+clus <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 10)
 
-# 3. Spatial network
-obj <- prepare_data(obj)
-net <- build_spatial_network(obj, method = "knn")
-obj <- calculate_neighborhood_features(obj, net)
-
-# 4. Functional analysis
-de_results <- perform_differential_expression(obj)
-enrichment <- perform_cluster_enrichment(de_results)
+visualize_spatial_distribution(df, point_size = 0.45)
+visualize_distance_heatmap(dist_result, show_values = TRUE)
+visualize_spatial_network(
+  clus, edges, edge_mode = "top", top_n = 1500, point_alpha = 1
+)
 ```
 
-For platform-specific parameters and visualization options, see the
-module tutorials linked below.
+## Modules
 
-## Analysis workflow
+### 1\. Preprocessing
 
-The overall workflow is summarized below:
+Load counts and coordinates, filter low-quality cells, normalize, and
+cluster.
 
-![](workflow.jpg)
+**Tutorial:** `vignette("preprocessing", package = "Sphinx")`
 
-### Module 1. Data preprocessing
+### 2\. Annotation
 
-- Import spatial data and standardize format
-  ([`load_spatial_data()`](https://mongi126.github.io/Sphinx/reference/load_spatial_data.md))
-- Filter low-quality cells and proteins
-  ([`filter_data()`](https://mongi126.github.io/Sphinx/reference/filter_data.md))
-- Normalize, scale, and cluster
-  ([`process_data()`](https://mongi126.github.io/Sphinx/reference/process_data.md))
-- Extract spatial coordinates
-  ([`extract_spatial_coordinates()`](https://mongi126.github.io/Sphinx/reference/extract_spatial_coordinates.md))
+Find markers, review violin / heatmap / UMAP views, and assign readable
+cell-type labels.
 
-**Tutorial:**
-[`vignette("preprocessing", package = "Sphinx")`](https://mongi126.github.io/Sphinx/articles/preprocessing.md)
+**Tutorial:** `vignette("annotation", package = "Sphinx")`
 
-### Module 2. Cell annotation
+### 3\. Spatial networks
 
-- Identify cluster-specific marker proteins
-  ([`find_top_markers()`](https://mongi126.github.io/Sphinx/reference/find_top_markers.md))
-- Visualize markers on UMAP and spatial maps
-- Annotate cell types automatically or manually
-  ([`annotate_celltypes()`](https://mongi126.github.io/Sphinx/reference/annotate_celltypes.md))
+Build adaptive graphs, derive neighborhood clusters, and plot distances,
+composition, purity, and interactions.
 
-**Tutorial:**
-[`vignette("annotation", package = "Sphinx")`](https://mongi126.github.io/Sphinx/articles/annotation.md)
+**Tutorial:** `vignette("spatial-network", package = "Sphinx")`
 
-### Module 3. Spatial neighborhood and network
+### 4\. Functional analysis
 
-- Build spatial graphs (kNN, Delaunay, radius, or window methods)
-- Compute neighborhood composition and spatial metrics
-- Analyze cell–cell interactions and spatial organization
+Test neighborhood-associated proteins (spatial-block aware), draw
+volcano plots, and summarize enrichment.
 
-**Tutorial:**
-[`vignette("spatial-network", package = "Sphinx")`](https://mongi126.github.io/Sphinx/articles/spatial-network.md)
+**Tutorial:** `vignette("functional", package = "Sphinx")`
 
-### Module 4. Functional analysis
+## Visualization defaults
 
-- Perform differential protein expression across clusters
-- Run pathway enrichment (GO, KEGG, Reactome)
-- Visualize enrichment and volcano plots
-
-**Tutorial:**
-[`vignette("functional", package = "Sphinx")`](https://mongi126.github.io/Sphinx/articles/functional.md)
+  - Stable candy qualitative colors via `assign_celltype_colors()`
+  - Soft pink sequential heatmaps; fonts at least 8 pt
+  - `visualize_spatial_network()` draws opaque points with a white halo;
+    use `zoom_center` / `zoom_radius` for local views
+  - Volcano y-axis caps `-log10(adj.P)` (default 50)
 
 ## Getting help
 
-``` r
-
-# Package documentation
-help(package = "Sphinx")
-
-# Function reference
-?load_spatial_data
-?build_spatial_network
-```
-
-Report bugs and request features on [GitHub
-Issues](https://github.com/mongi126/Sphinx/issues).
+  - Website: <https://mongi126.github.io/Sphinx/>
+  - Issues: <https://github.com/mongi126/Sphinx/issues>

@@ -2,11 +2,11 @@
 % Please edit documentation in R/spatial_network.R
 \name{.n_grid_windows}
 \alias{.n_grid_windows}
-\title{Number of grid windows covering the spatial extent (Stereopy-style binning)}
+\title{Number of grid windows covering the spatial extent}
 \usage{
 .n_grid_windows(x, y, win_size)
 }
 \description{
-Number of grid windows covering the spatial extent (Stereopy-style binning)
+Number of grid windows covering the spatial extent
 }
 \keyword{internal}

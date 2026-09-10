@@ -20,42 +20,55 @@ cluster_neighborhoods(
 
 ## Arguments
 
-- feature_df:
+  - feature\_df:
+    
+    Data.table with neighborhood features
 
-  Data.table with neighborhood features
+  - spatial\_edges:
+    
+    Spatial edges from build\_spatial\_network()
 
-- spatial_edges:
+  - method:
+    
+    Clustering method ("kmeans", "hdbscan", or "louvain")
 
-  Spatial edges from build_spatial_network()
+  - k:
+    
+    Number of clusters (for kmeans). This is **not** spatial neighbor
+    count; use `n_neighbors` in `build_spatial_network()`.
 
-- method:
+  - use\_pca:
+    
+    Whether to use PCA for dimensionality reduction
 
-  Clustering method ("kmeans", "hdbscan", or "louvain")
+  - var\_threshold:
+    
+    Variance threshold for PCA components
 
-- k:
+  - n\_components:
+    
+    Explicit number of PCA components (overrides var\_threshold)
 
-  Number of clusters (for kmeans)
+  - min\_cluster\_size:
+    
+    Minimum points per cluster (for hdbscan)
 
-- use_pca:
-
-  Whether to use PCA for dimensionality reduction
-
-- var_threshold:
-
-  Variance threshold for PCA components
-
-- n_components:
-
-  Explicit number of PCA components (overrides var_threshold)
-
-- min_cluster_size:
-
-  Minimum points per cluster (for hdbscan)
-
-- cluster_colname:
-
-  Name for the output cluster column
+  - cluster\_colname:
+    
+    Name for the output cluster column
 
 ## Value
 
-Data.table with cluster assignments in cluster_colname
+Data.table with cluster assignments in cluster\_colname
+
+## Examples
+
+``` r
+# \donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
+feat <- calculate_neighborhood_features(df, edges)
+cl <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 3)
+"Neighborhood_Cluster" %in% names(cl)
+# }
+```

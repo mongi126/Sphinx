@@ -30,26 +30,39 @@ process_data(
 
 ## Arguments
 
-- obj:
+  - obj:
+    
+    Seurat object containing filtered spatial data
 
-  Seurat object containing filtered spatial data
+  - normalization.method:
+    
+    Normalization method (default: "CLR")
 
-- normalization.method:
+  - margin:
+    
+    Margin for normalization (1=features, 2=cells) (default: 2)
 
-  Normalization method (default: "CLR")
+  - dims:
+    
+    Dimensions for reduction (default: 1:10)
 
-- margin:
-
-  Margin for normalization (1=features, 2=cells) (default: 2)
-
-- dims:
-
-  Dimensions for reduction (default: 1:10)
-
-- resolution:
-
-  Clustering resolution (default: 0.5)
+  - resolution:
+    
+    Clustering resolution (default: 0.5)
 
 ## Value
 
 Processed Seurat object with dimensionality reduction and clustering
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(30)
+obj <- process_data(obj, dims = 1:3)
+# }
+if (FALSE) { # \dontrun{
+# Full-resolution clustering on real data:
+# obj <- process_data(obj, dims = 1:10, resolution = 0.5)
+} # }
+```

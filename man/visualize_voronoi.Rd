@@ -10,7 +10,7 @@ visualize_voronoi(
   y_col = "Y",
   coloring = c("celltype", "neighborhood"),
   highlight_cluster = NULL,
-  celltype_col = "annotation",
+  celltype_col = "celltype",
   neighborhood_col = "Neighborhood_Cluster",
   background_color = "gray90",
   highlight_alpha = 0.9,
@@ -33,7 +33,7 @@ visualize_voronoi(
 
 \item{highlight_cluster}{Specific cluster to highlight (optional)}
 
-\item{celltype_col}{Cell type column name (default: "annotation")}
+\item{celltype_col}{Cell type column name (default: "celltype")}
 
 \item{neighborhood_col}{Neighborhood cluster column name (default: "Neighborhood_Cluster")}
 

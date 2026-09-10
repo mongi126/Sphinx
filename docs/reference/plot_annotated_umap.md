@@ -23,22 +23,34 @@ plot_annotated_umap(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with cell type annotations
 
-  Seurat object with cell type annotations
+  - save\_path:
+    
+    Output file path (default: "celltype\_umap.pdf")
 
-- save_path:
+  - width:
+    
+    Plot width in inches (default: 11)
 
-  Output file path (default: "celltype_umap.pdf")
-
-- width:
-
-  Plot width in inches (default: 11)
-
-- height:
-
-  Plot height in inches (default: 8)
+  - height:
+    
+    Plot height in inches (default: 8)
 
 ## Value
 
 ggplot object containing annotated UMAP
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+p <- plot_annotated_umap(obj, save_path = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

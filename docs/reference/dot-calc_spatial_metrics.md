@@ -10,21 +10,21 @@ Calculate spatial metrics for method selection
 
 ## Arguments
 
-- df:
+  - df:
+    
+    data.table with spatial data
 
-  data.table with spatial data
+  - celltype\_col:
+    
+    cell type column name
 
-- celltype_col:
+  - x\_col:
+    
+    optional X coordinate column name (auto-detects X/x)
 
-  cell type column name
-
-- x_col:
-
-  optional X coordinate column name (auto-detects X/x)
-
-- y_col:
-
-  optional Y coordinate column name (auto-detects Y/y)
+  - y\_col:
+    
+    optional Y coordinate column name (auto-detects Y/y)
 
 ## Value
 

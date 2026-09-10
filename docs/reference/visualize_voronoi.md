@@ -11,7 +11,7 @@ visualize_voronoi(
   y_col = "Y",
   coloring = c("celltype", "neighborhood"),
   highlight_cluster = NULL,
-  celltype_col = "annotation",
+  celltype_col = "celltype",
   neighborhood_col = "Neighborhood_Cluster",
   background_color = "gray90",
   highlight_alpha = 0.9,
@@ -26,66 +26,78 @@ visualize_voronoi(
 
 ## Arguments
 
-- df:
+  - df:
+    
+    Spatial data with coordinates and annotations
 
-  Spatial data with coordinates and annotations
+  - x\_col:
+    
+    X coordinate column name (default: "X")
 
-- x_col:
+  - y\_col:
+    
+    Y coordinate column name (default: "Y")
 
-  X coordinate column name (default: "X")
+  - coloring:
+    
+    Coloring method: "celltype" or "neighborhood" (default: "celltype")
 
-- y_col:
+  - highlight\_cluster:
+    
+    Specific cluster to highlight (optional)
 
-  Y coordinate column name (default: "Y")
+  - celltype\_col:
+    
+    Cell type column name (default: "celltype")
 
-- coloring:
+  - neighborhood\_col:
+    
+    Neighborhood cluster column name (default: "Neighborhood\_Cluster")
 
-  Coloring method: "celltype" or "neighborhood" (default: "celltype")
+  - background\_color:
+    
+    Background color for non-highlighted cells (default: "gray90")
 
-- highlight_cluster:
+  - highlight\_alpha:
+    
+    Alpha for highlighted cells (default: 0.9)
 
-  Specific cluster to highlight (optional)
+  - background\_alpha:
+    
+    Alpha for background cells (default: 0.3)
 
-- celltype_col:
+  - celltype\_palette:
+    
+    Custom color palette for cell types (optional)
 
-  Cell type column name (default: "annotation")
+  - show\_composition:
+    
+    Show cell type composition in highlight (default: TRUE)
 
-- neighborhood_col:
+  - save\_path:
+    
+    Output file path (optional)
 
-  Neighborhood cluster column name (default: "Neighborhood_Cluster")
+  - width:
+    
+    Plot width in inches (default: 12)
 
-- background_color:
-
-  Background color for non-highlighted cells (default: "gray90")
-
-- highlight_alpha:
-
-  Alpha for highlighted cells (default: 0.9)
-
-- background_alpha:
-
-  Alpha for background cells (default: 0.3)
-
-- celltype_palette:
-
-  Custom color palette for cell types (optional)
-
-- show_composition:
-
-  Show cell type composition in highlight (default: TRUE)
-
-- save_path:
-
-  Output file path (optional)
-
-- width:
-
-  Plot width in inches (default: 12)
-
-- height:
-
-  Plot height in inches (default: 10)
+  - height:
+    
+    Plot height in inches (default: 10)
 
 ## Value
 
-ggplot object and saves plot to file if save_path provided
+ggplot object and saves plot to file if save\_path provided
+
+## Examples
+
+``` r
+# \donttest{
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+p <- visualize_voronoi(df, celltype_col = "celltype",
+  save_path = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

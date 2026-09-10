@@ -10,7 +10,16 @@ build_spatial_network(
   k = NULL,
   radius = NULL,
   window_size = NULL,
-  max_edges = 1e+06,
+  window_slide_step = NULL,
+  max_edge_length = NULL,
+  max_dist = NULL,
+  edge_length_mult = 1,
+  edge_length_quantile = 0.95,
+  n_neighbors = 10L,
+  max_degree = NULL,
+  require_mutual = TRUE,
+  max_edges = NULL,
+  n_cores = NULL,
   celltype_col = "celltype",
   verbose = TRUE
 )
@@ -20,13 +29,55 @@ build_spatial_network(
 
 \item{method}{one of c("auto","radius","knn","delaunay","window")}
 
-\item{k}{integer, neighbors for knn/window methods (default chosen automatically)}
+\item{k}{\strong{deprecated} neighbor count. Use \code{n_neighbors}. Clustering \code{k}
+belongs to \code{cluster_neighborhoods()}, not this function.}
 
 \item{radius}{numeric, search radius for radius method (auto if NULL)}
 
-\item{window_size}{numeric, grid side length for window method (auto if NULL)}
+\item{window_size}{numeric, sliding-window side length for window method
+(auto if NULL). Stereopy CCD: target 30-50 cells per window.}
 
-\item{max_edges}{integer, hard cap on number of returned edges (may be downsampled)}
+\item{window_slide_step}{numeric, stride of the sliding window. \code{NULL}
+(default) uses half of \code{window_size}, as in Stereopy CCD.}
+
+\item{max_edge_length}{distance gate. \code{NULL} / \code{Inf} (default): no gate for
+knn/delaunay/window. Numeric: keep edges with \verb{dist <=} this value.
+\code{"auto"}: use \code{edge_length_quantile} of per-cell k-th NN distances
+(scaled by \code{edge_length_mult}). For \code{method = "radius"}, the search
+radius itself is the gate.}
+
+\item{max_dist}{numeric absolute distance cap in the same units as X/Y.
+If set, overrides \code{max_edge_length}.}
+
+\item{edge_length_mult}{numeric multiplier for \code{max_edge_length = "auto"}
+(default 1.0). Ignored unless auto gating is requested.}
+
+\item{edge_length_quantile}{quantile of per-cell k-th NN distances when
+\code{max_edge_length = "auto"} (default 0.95).}
+
+\item{n_neighbors}{integer number of spatial neighbors (knn/window search
+rank and post-filter degree cap). Default \code{10} for knn/window (aligned
+with \code{.default_nn_rank()} and the auto baseline). For
+\code{method = "radius"} or \code{"delaunay"}, omitted/\code{NULL} means no degree cap
+(\code{Inf}: keep the ball graph / triangulation). Alias of \code{max_degree}.
+This is \strong{not} the clustering \code{k} used by \code{cluster_neighborhoods()}.}
+
+\item{max_degree}{integer. Alias of \code{n_neighbors}. Used only when
+\code{n_neighbors} is not supplied. If both are set, \code{n_neighbors} wins.
+Set \code{Inf} to disable degree capping.}
+
+\item{require_mutual}{logical. If TRUE, keep an edge only when both cells list
+each other among their \code{n_neighbors} nearest contacts. Default \code{TRUE} for
+knn/window (auto baseline). For \code{method = "radius"} defaults to \code{FALSE}
+unless set explicitly. Delaunay edges are already mutual; the flag only
+matters if a degree cap is also set.}
+
+\item{max_edges}{deprecated; ignored. Edges are filtered by distance and
+per-cell degree only (no global random downsampling).}
+
+\item{n_cores}{integer parallel workers for knn / radius construction. NULL
+uses \code{SPHINX_N_CORES} if set, otherwise up to 8 detected cores (fork on Unix).
+Also passed as \code{num.threads} to kNN search when using a single chunk.}
 
 \item{celltype_col}{character, column with cell-type labels (optional)}
 
@@ -38,10 +89,31 @@ data.table with columns: from, to, dist (and optional context columns)
 \description{
 This function builds a cell-cell spatial network using one of four methods
 ("radius", "knn", "delaunay", "window"). When \code{method = "auto"}, it
-selects the method based on robust spatial metrics computed from the data.
+selects the method from within-sample spatial metrics using an empirical
+decision tree (multi-cohort network evaluation; see \code{.select_method()}):
+baseline knn(k=10, mutual); radius when types are strongly clustered and
+density is fairly uniform; delaunay for continuous / large / heterogeneous
+layouts (optional length gate); window only for ordered tiled-like FOVs.
+}
+\details{
+By default there is \strong{no} distance gate for knn / delaunay / window (same
+idea as leaving \code{max_dist} unset), except that \code{method = "auto"} may
+recommend \code{max_edge_length = "auto"} for delaunay. Optionally set
+\code{max_dist} (absolute), a numeric \code{max_edge_length}, or
+\code{max_edge_length = "auto"} (upper quantile of per-cell k-th NN distances)
+to drop long edges. Each cell can also be limited to its \code{n_neighbors} /
+\code{max_degree} nearest contacts.
 }
 \examples{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
+# Optional absolute distance gate (same units as X/Y):
+edges2 <- build_spatial_network(
+  df, method = "knn", n_neighbors = 10, max_dist = 40, verbose = FALSE
+)
+# Optional adaptive gate (quantile of k-th NN distances):
+edges3 <- build_spatial_network(
+  df, method = "knn", n_neighbors = 10, max_edge_length = "auto", verbose = FALSE
+)
 head(edges)
 }

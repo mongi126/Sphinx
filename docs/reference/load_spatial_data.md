@@ -24,35 +24,45 @@ load_spatial_data(
 
 ## Arguments
 
-- filename:
+  - filename:
+    
+    Path to input data file (RDS, CSV counts, or CSV coordinates)
 
-  Path to input data file (RDS, CSV counts, or CSV coordinates)
+  - counts\_file:
+    
+    Path to counts CSV file (if using separate counts and coordinates)
 
-- counts_file:
+  - coords\_file:
+    
+    Path to coordinates CSV file (if using separate counts and
+    coordinates)
 
-  Path to counts CSV file (if using separate counts and coordinates)
+  - type:
+    
+    Data source type: "auto", "rds", "csv", or "akoya" (default: "auto")
 
-- coords_file:
+  - akoya\_type:
+    
+    Type of Akoya data: "qupath" or other formats (default: "qupath")
 
-  Path to coordinates CSV file (if using separate counts and
-  coordinates)
+  - fov:
+    
+    Field of view specification (default: "phenocycler")
 
-- type:
-
-  Data source type: "auto", "rds", "csv", or "akoya" (default: "auto")
-
-- akoya_type:
-
-  Type of Akoya data: "qupath" or other formats (default: "qupath")
-
-- fov:
-
-  Field of view specification (default: "phenocycler")
-
-- ...:
-
-  Additional parameters passed to loading functions
+  - ...:
+    
+    Additional parameters passed to loading functions
 
 ## Value
 
 Seurat object containing spatial data
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+# From RDS or CSV files on disk:
+# obj <- load_spatial_data(filename = "sample.rds")
+# obj <- load_spatial_data(counts_file = "counts.csv", coords_file = "coords.csv")
+} # }
+```

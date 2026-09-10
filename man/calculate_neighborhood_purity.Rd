@@ -10,8 +10,11 @@ calculate_neighborhood_purity(
   y_col = "Y",
   celltype_col = "celltype",
   method = c("window", "radius", "knn", "delaunay"),
-  k = 30,
-  radius = 30,
+  n_neighbors = 10L,
+  k = NULL,
+  radius = NULL,
+  window_size = NULL,
+  window_slide_step = NULL,
   min_cells = 5,
   verbose = TRUE
 )
@@ -27,9 +30,17 @@ calculate_neighborhood_purity(
 
 \item{method}{Character, neighbor definition: "window", "radius", "knn", or "delaunay".}
 
-\item{k}{Integer, number of nearest neighbors for method = "knn" (ignored otherwise).}
+\item{n_neighbors}{Integer, neighbor count for \code{knn} and \code{window}.}
 
-\item{radius}{Numeric, distance threshold for methods "radius" and "window" (ignored otherwise).}
+\item{k}{Integer, \strong{deprecated} neighbor count. Use \code{n_neighbors}.}
+
+\item{radius}{Numeric search radius for \code{method = "radius"}. \code{NULL} uses
+the same 1-NN x 3 default as \code{build_spatial_network()}.}
+
+\item{window_size}{Sliding-window side length for \code{method = "window"}.
+\code{NULL} uses the same data default as \code{build_spatial_network()}.}
+
+\item{window_slide_step}{Window stride; \code{NULL} uses \code{window_size / 2}.}
 
 \item{min_cells}{Integer, minimum number of neighbors required to compute purity.}
 
@@ -39,10 +50,11 @@ calculate_neighborhood_purity(
 A data.table with an added column \code{Neighborhood_Purity}.
 }
 \description{
-Calculate neighborhood purity using flexible neighbor definitions
+Neighbor definitions match \code{build_spatial_network()}: knn, radius ball,
+Delaunay triangulation, or Stereopy-style sliding window + local kNN.
 }
 \examples{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-out <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+out <- calculate_neighborhood_purity(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 summary(out$Neighborhood_Purity)
 }

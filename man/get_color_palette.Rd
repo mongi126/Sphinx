@@ -13,13 +13,8 @@ get_color_palette(n)
 Vector of color codes
 }
 \description{
-Creates optimized color palettes:
-\enumerate{
-\item Small sets: ColorBrewer Set1
-\item Medium sets: Set3
-\item Large sets: Hue palette
-Ensures distinct colors for all categories
-}
+Soft candy colors that stay distinct (no neon / fluorescent hues).
+Continuous heatmaps keep the pink sequential ramp unchanged.
 }
 \examples{
 get_color_palette(5)

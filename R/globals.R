@@ -9,5 +9,7 @@ utils::globalVariables(c(
   "seurat_clusters", "plot_celltype", "to_x", "from_x",
   "to_y", "from_y", "x", "y", "cell_id", "fill_color",
   "highlight", "border_color", "color_group", "celltype",
-  "logP", "Significance", "LoadAkoya", "MeanDiff"
+  "logP", "Significance", "LoadAkoya", "MeanDiff",
+  "a", "b", "cell", "nbr", "ord", "N", "strength",
+  "point_class", "neglog10p_plot", "neglog10p", "is_capped"
 ))

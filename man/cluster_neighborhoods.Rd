@@ -23,7 +23,8 @@ cluster_neighborhoods(
 
 \item{method}{Clustering method ("kmeans", "hdbscan", or "louvain")}
 
-\item{k}{Number of clusters (for kmeans)}
+\item{k}{Number of clusters (for kmeans). This is \strong{not} spatial neighbor count;
+use \code{n_neighbors} in \code{build_spatial_network()}.}
 
 \item{use_pca}{Whether to use PCA for dimensionality reduction}
 
@@ -44,7 +45,7 @@ Cluster neighborhoods using combined spatial and compositional features
 \examples{
 \donttest{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 feat <- calculate_neighborhood_features(df, edges)
 cl <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 3)
 "Neighborhood_Cluster" \%in\% names(cl)

@@ -1,7 +1,7 @@
 # Custom color palette for cell type visualizations
 
-A predefined vector of 36 distinct colors for consistent cell type
-coloring
+Distinct candy qualitative colors (one hue family per color) used as a
+fallback palette for annotation plots.
 
 ## Usage
 
@@ -11,4 +11,4 @@ celltype_colors
 
 ## Format
 
-An object of class `character` of length 36.
+A character vector of hex color codes.

@@ -26,26 +26,38 @@ plot_spatial_distribution(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with spatial coordinates
 
-  Seurat object with spatial coordinates
+  - save\_path:
+    
+    Output file path (default: "celltype\_spatial\_plot.pdf")
 
-- save_path:
+  - width:
+    
+    Plot width in inches (default: 10)
 
-  Output file path (default: "celltype_spatial_plot.pdf")
+  - height:
+    
+    Plot height in inches (default: 8)
 
-- width:
-
-  Plot width in inches (default: 10)
-
-- height:
-
-  Plot height in inches (default: 8)
-
-- point.size:
-
-  numeric, size of scatter points (default 0.5)
+  - point.size:
+    
+    numeric, size of scatter points (default 0.5)
 
 ## Value
 
 ggplot object containing spatial distribution plot
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+cls <- levels(obj@meta.data$seurat_clusters)
+obj <- annotate_celltypes(obj, cls, paste0("Type", seq_along(cls)))
+p <- plot_spatial_distribution(obj, save_path = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

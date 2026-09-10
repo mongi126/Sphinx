@@ -15,22 +15,31 @@ calculate_neighborhood_features(
 
 ## Arguments
 
-- df:
+  - df:
+    
+    Spatial data with cell types
 
-  Spatial data with cell types
+  - edges:
+    
+    Data.frame of edges from build\_spatial\_network()
 
-- edges:
+  - cell\_id\_col:
+    
+    Column name for cell IDs (default: "Cell\_ID")
 
-  Data.frame of edges from build_spatial_network()
-
-- cell_id_col:
-
-  Column name for cell IDs (default: "Cell_ID")
-
-- celltype_col:
-
-  Column name for cell types (default: "celltype")
+  - celltype\_col:
+    
+    Column name for cell types (default: "celltype")
 
 ## Value
 
 Enhanced data.table with neighborhood type proportions
+
+## Examples
+
+``` r
+df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
+feat <- calculate_neighborhood_features(df, edges)
+names(feat)
+```

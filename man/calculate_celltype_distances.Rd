@@ -8,7 +8,7 @@ calculate_celltype_distances(
   df,
   x_col = "X",
   y_col = "Y",
-  celltype_col = "annotation"
+  celltype_col = "celltype"
 )
 }
 \arguments{
@@ -18,7 +18,7 @@ calculate_celltype_distances(
 
 \item{y_col}{Column name for Y coordinates (default: "Y")}
 
-\item{celltype_col}{Column name for cell types (default: "annotation")}
+\item{celltype_col}{Column name for cell types (default: "celltype")}
 }
 \value{
 List with distance matrix and distributions

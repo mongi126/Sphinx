@@ -34,50 +34,61 @@ plot_umap_markers(
 
 ## Arguments
 
-- seurat_obj:
+  - seurat\_obj:
+    
+    Seurat object with UMAP reduction
 
-  Seurat object with UMAP reduction
+  - markers:
+    
+    Vector of marker genes/proteins to visualize (default: NULL)
 
-- markers:
+  - assay:
+    
+    Assay name containing expression data (default: NULL)
 
-  Vector of marker genes/proteins to visualize (default: NULL)
+  - ncol:
+    
+    Number of columns for multi-plot layout (default: 3)
 
-- assay:
+  - point\_size:
+    
+    Point size for UMAP scatter plot (default: 1.2)
 
-  Assay name containing expression data (default: NULL)
+  - alpha:
+    
+    Transparency level for points (default: 0.9)
 
-- ncol:
+  - color\_low:
+    
+    Color for low expression values (default: "lightgrey")
 
-  Number of columns for multi-plot layout (default: 3)
+  - color\_high:
+    
+    Color for high expression values (default: "red")
 
-- point_size:
+  - output\_file:
+    
+    Output file path (default: "umap\_markers\_plot.pdf")
 
-  Point size for UMAP scatter plot (default: 1.2)
+  - width:
+    
+    Plot width in inches (default: NULL, auto-calculated)
 
-- alpha:
-
-  Transparency level for points (default: 0.9)
-
-- color_low:
-
-  Color for low expression values (default: "lightgrey")
-
-- color_high:
-
-  Color for high expression values (default: "red")
-
-- output_file:
-
-  Output file path (default: "umap_markers_plot.pdf")
-
-- width:
-
-  Plot width in inches (default: NULL, auto-calculated)
-
-- height:
-
-  Plot height in inches (default: NULL, auto-calculated)
+  - height:
+    
+    Plot height in inches (default: NULL, auto-calculated)
 
 ## Value
 
 Combined ggplot object with UMAP marker expression plots
+
+## Examples
+
+``` r
+# \donttest{
+obj <- Sphinx:::.sphinx_example_seurat(25)
+p <- plot_umap_markers(obj, markers = rownames(obj)[1:2],
+  output_file = tempfile(fileext = ".pdf"))
+class(p)
+# }
+```

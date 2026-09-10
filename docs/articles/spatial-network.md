@@ -1,254 +1,143 @@
 # Spatial Network Analysis
 
-This tutorial demonstrates the complete workflow for spatial network
-analysis using Sphinx package.
+## Overview
 
-## Load Required Packages
+This module builds adaptive spatial graphs, derives neighborhood
+features and clusters, and visualizes distances, composition, purity,
+and cell-cell interactions.
+
+**Demo:** reg055\_A (CODEX CRC, Schurch *et al.* 2020) with annotated
+cell-type labels from the annotation tutorial.
+
+## Load packages and prepare data
 
 ``` r
-
 library(Sphinx)
 library(data.table)
+library(dplyr)
 library(ggplot2)
-library(ComplexHeatmap)
-```
 
-## 1.Data Preparation
-
-``` r
-
-# Load spatial metadata
-df <- fread("tsu35_metadata.csv")
-
-# Prepare data for spatial analysis
-df <- prepare_data(df,
-                   cell_id_col = "V1",
-                   celltype_col = "celltype")
-```
-
-### Spatial Distribution of Cell Types
-
-``` r
-
-visualize_spatial_distribution(
-  df,
-  x_col = "X",
-  y_col = "Y",
-  celltype_col = "celltype",
-  point_size = 0.7,
-  title = "Spatial Distribution of Cell Types"
+# meta: Cell_ID, X, Y, celltype
+df <- prepare_data(
+  meta, cell_id_col = "Cell_ID", x_col = "X", y_col = "Y",
+  celltype_col = "celltype"
 )
 ```
 
-![](01_spatial_distribution_celltype.jpg)
-
-*Visualize spatial cell type distribution*
-
-## 2.Spatial Distance Analysis
+## Spatial distribution
 
 ``` r
-
-# Calculate optimal radius for neighborhood definition
-dist_info <- calculate_optimal_radius(df)
-message("Recommended radius: ", round(dist_info$recommended_radius, 2))
-
-# Calculate distances between cell types
-dist_result <- calculate_celltype_distances(df, celltype_col = "celltype")
-visualize_distance_heatmap(dist_result)
+visualize_spatial_distribution(
+  df, point_size = 0.45, point_alpha = 0.95,
+  title = "Annotated cell types"
+)
 ```
 
-![](02_distance_heatmap.jpg)
+![](01_spatial_distribution_celltype.png)
+
+## Cell-type distances
 
 ``` r
-
+dist_result <- calculate_celltype_distances(df, celltype_col = "celltype")
+visualize_distance_heatmap(dist_result, show_values = TRUE)
 visualize_distance_parallel(dist_result)
 ```
 
-## 3.Spatial Network Construction
+![](02_distance_heatmap.png)
+
+## Build spatial network
+
+`build_spatial_network()` selects a graph method (`auto` / knn / radius
+/ delaunay / window) and applies biological edge filtering (mutual
+nearest neighbors and distance gating where configured).
 
 ``` r
-
-# Build spatial network using automatic method selection
-spatial_edges <- build_spatial_network(
-  df,
-  method = "auto",
-  celltype_col = "celltype"
-)
+edges <- build_spatial_network(df, method = "auto", celltype_col = "celltype")
+feat <- calculate_neighborhood_features(df, edges, celltype_col = "celltype")
+clus <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 10)
 ```
 
-## 4.Neighborhood Feature Calculation
+## Neighborhood clusters & composition
 
 ``` r
-
-# Calculate neighborhood composition features
-feature_df <- calculate_neighborhood_features(
-  df, 
-  spatial_edges,
-  celltype_col = "celltype"
-)
-```
-
-## 5.Neighborhood Clustering
-
-``` r
-
-# Cluster neighborhoods based on spatial features
-clustered_df <- cluster_neighborhoods(
-  feature_df = feature_df,
-  spatial_edges = spatial_edges,
-  method = "kmeans",
-  k = 12
-)
-
-message("Identified ", length(unique(clustered_df$Neighborhood_Cluster)), " neighborhood clusters")
-```
-
-### Neighborhood Clusters
-
-``` r
-
 visualize_spatial_distribution(
-  clustered_df,
-  x_col = "X", 
-  y_col = "Y",
-  celltype_col = "Neighborhood_Cluster",
-  point_size = 1.5,
-  point_alpha = 0.6,
-  title = "Neighborhood Clusters"
+  clus, celltype_col = "Neighborhood_Cluster",
+  point_size = 0.45, title = "Neighborhood clusters"
+)
+
+comp <- calculate_cluster_composition(clus)
+plot_composition_barplot(comp)
+plot_composition_heatmap(comp, cell_fontsize = 10)
+```
+
+![](05_spatial_distribution_clusters.png)
+
+![](07_cluster_composition_barplot.png)
+
+![](06_composition_heatmap.png)
+
+## Neighborhood purity
+
+``` r
+pur <- calculate_neighborhood_purity(clus, method = "knn", n_neighbors = 10)
+visualize_neighborhood_purity(pur, point_size = 0.55)
+```
+
+![](04_neighborhood_purity.png)
+
+## Interactions
+
+``` r
+intx <- analyze_spatial_interactions(clus, edges, celltype_col = "celltype")
+
+visualize_interaction_heatmap(
+  intx$interaction_matrix, transform = TRUE,
+  display_numbers = FALSE, cellwidth = 10, cellheight = 10
+)
+
+visualize_interaction_network(intx$network)
+```
+
+![](08_interaction_heatmap.png)
+
+![](11_cell_interaction_network.png)
+
+## Spatial network graph (real edges)
+
+Points are opaque with a white halo so colors remain clear over edges.
+For overview plots use `edge_mode = "top"`; for local zoom, shrink
+`zoom_radius` and downsample edges with `edge_mode = "random"` so
+structure stays readable.
+
+``` r
+visualize_spatial_network(
+  clus, edges, edge_mode = "top", top_n = 1200,
+  point_size = 0.5, point_alpha = 1
+)
+
+cx <- mean(range(clus$X)); cy <- mean(range(clus$Y))
+zr <- max(diff(range(clus$X)), diff(range(clus$Y))) * 0.07
+visualize_spatial_network(
+  clus, edges,
+  edge_mode = "random", max_edges = 180,
+  zoom_center = c(cx, cy), zoom_radius = zr,
+  point_size = 2.2, point_alpha = 1,
+  title = "Spatial network (local zoom)"
 )
 ```
 
-![](05_spatial_distribution_clusters.jpg)
+![](10_spatial_network.png)
 
-### Cluster Composition
+![](10_spatial_network_zoom.png)
 
-``` r
-
-# Calculate cluster composition
-comp_df <- calculate_cluster_composition(
-  clustered_df,
-  cluster_col = "Neighborhood_Cluster", 
-  celltype_col = "celltype"
-)
-
-# Plot composition bar plot
-plot_composition_barplot(
-  comp_df,
-  cluster_col = "Neighborhood_Cluster",
-  celltype_col = "celltype", 
-  value_col = "proportion"
-)
-```
-
-![](07_cluster_composition_barplot.jpg)
-
-### Voronoi Diagram
+## Voronoi view
 
 ``` r
-
-visualize_voronoi(
-  clustered_df,
-  coloring = "neighborhood",
-  celltype_col = "celltype",
-  neighborhood_col = "Neighborhood_Cluster"
-)
+visualize_voronoi(clus, coloring = "neighborhood")
 ```
 
 ![](12_voronoi_neighborhood.png)
 
-## 6.Spatial Interaction Analysis
+## Next step
 
-``` r
-
-# Analyze cell-cell spatial interactions
-interaction_results <- analyze_spatial_interactions(
-  clustered_df,
-  spatial_edges,
-  celltype_col = "celltype"
-)
-```
-
-### Cell-Cell Interactions
-
-``` r
-
-visualize_interaction_heatmap(
-  interaction_results$interaction_matrix, 
-  transform = TRUE
-)
-```
-
-![](08_interaction_heatmap.jpg)
-
-### Spatial Network Visualization
-
-``` r
-
-visualize_spatial_network(
-  clustered_df,
-  spatial_edges,
-  celltype_col = "celltype",
-  x_col = "X",
-  y_col = "Y", 
-  edge_mode = "top",
-  top_n = 5,
-  point_size = 0.01,
-  point_alpha = 0.7,
-  edge_size_range = c(0.3, 2),
-  edge_alpha_range = c(0.3, 0.9),
-  edge_color = "black"
-)
-```
-
-![](10_spatial_network.jpg)
-
-### Interaction Network Graph
-
-``` r
-
-visualize_interaction_network(
-  interaction_results$network,
-  node_size_range = c(5, 15),
-  edge_size_range = c(0.5, 3),
-  label_size = 4,
-  show_labels = TRUE,
-  max_nodes = 50
-)
-```
-
-![](11_cell_interaction_network.jpg)
-
-## 7.Neighborhood Purity Analysis
-
-``` r
-
-# Calculate neighborhood purity using radius method
-neighborhood_purity <- calculate_neighborhood_purity(
-  clustered_df,
-  x_col = "X",
-  y_col = "Y", 
-  celltype_col = "celltype",
-  method = "radius",
-  radius = 16.8,
-  min_cells = 5,
-  verbose = TRUE
-)
-```
-
-### Neighborhood Purity Graph
-
-``` r
-
-visualize_neighborhood_purity(
-    neighborhood_purity,
-    x_col = "X",
-    y_col = "Y",
-    celltype_col = "celltype",
-    # max_points = 1000,
-    point_size = 1.0,
-    point_alpha = 0.8,
-    title = "Neighborhood Purity"
-  )
-```
-
-![](04_neighborhood_purity.jpg)
+`vignette("functional", package = "Sphinx")`

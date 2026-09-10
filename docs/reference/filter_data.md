@@ -14,18 +14,28 @@ filter_data(obj, nCount_mad_threshold = 3, nFeature_quantile_threshold = 0.05)
 
 ## Arguments
 
-- obj:
+  - obj:
+    
+    Seurat object containing spatial data
 
-  Seurat object containing spatial data
+  - nCount\_mad\_threshold:
+    
+    MAD threshold for total count filtering (default: 3)
 
-- nCount_mad_threshold:
-
-  MAD threshold for total count filtering (default: 3)
-
-- nFeature_quantile_threshold:
-
-  Quantile threshold for detected features (default: 0.05)
+  - nFeature\_quantile\_threshold:
+    
+    Quantile threshold for detected features (default: 0.05)
 
 ## Value
 
 Filtered Seurat object
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+obj <- Sphinx:::.sphinx_example_seurat(50)
+obj_filt <- filter_data(obj)
+ncol(obj_filt)
+} # }
+```

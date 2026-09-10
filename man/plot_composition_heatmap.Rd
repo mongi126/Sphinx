@@ -11,7 +11,8 @@ plot_composition_heatmap(
   value_col = "proportion",
   save_path = NULL,
   width = 12,
-  height = 10
+  height = 10,
+  cell_fontsize = 11
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ plot_composition_heatmap(
 \item{width}{Plot width in inches (default: 12)}
 
 \item{height}{Plot height in inches (default: 10)}
+
+\item{cell_fontsize}{Font size for in-cell numbers (default: 11; minimum 8)}
 }
 \value{
 ComplexHeatmap object and saves plot to file if save_path provided
@@ -37,9 +40,11 @@ Visualize cluster composition as heatmap
 }
 \examples{
 \donttest{
-df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
-comp <- calculate_cluster_composition(df)
-plot_composition_heatmap(comp, save_path = tempfile(fileext = ".pdf"))
+if (requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+  df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+  df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+  comp <- calculate_cluster_composition(df)
+  plot_composition_heatmap(comp, save_path = tempfile(fileext = ".pdf"))
+}
 }
 }

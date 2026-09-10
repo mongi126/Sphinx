@@ -1,26 +1,37 @@
-# Build edges using window method
+# Build edges with a Stereopy-style sliding window + local kNN
 
-Build edges using window method
+Windows of side `tile` (`window_size`) slide over the field with stride
+`sliding_step` (default half the window). Inside each window a kNN graph
+is built; overlapping windows are merged (undirected, shortest edge
+kept).
 
 ## Usage
 
 ``` r
-.edges_window(df, k, tile)
+.edges_window(df, k, tile, sliding_step = NULL, max_edge_length = NULL)
 ```
 
 ## Arguments
 
-- df:
+  - df:
+    
+    data.table with spatial data
 
-  data.table with spatial data
+  - k:
+    
+    number of neighbors inside each window
 
-- k:
+  - tile:
+    
+    window side length (Stereopy `d`)
 
-  number of neighbors
+  - sliding\_step:
+    
+    window stride (Stereopy `s`; default `tile / 2`)
 
-- tile:
-
-  window size
+  - max\_edge\_length:
+    
+    optional maximum edge length filter
 
 ## Value
 

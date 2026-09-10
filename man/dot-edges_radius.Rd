@@ -2,21 +2,26 @@
 % Please edit documentation in R/spatial_network.R
 \name{.edges_radius}
 \alias{.edges_radius}
-\title{Build edges using radius method}
+\title{Build edges using radius method (exact ball graph)}
 \usage{
-.edges_radius(df, radius, k_cap = 50)
+.edges_radius(df, radius, n_cores = NULL)
 }
 \arguments{
 \item{df}{data.table with spatial data}
 
 \item{radius}{search radius}
 
-\item{k_cap}{maximum neighbors to consider}
+\item{n_cores}{parallel workers (NULL = auto)}
 }
 \value{
 data.table with edges
 }
 \description{
-Build edges using radius method
+Connects every pair of cells whose Euclidean distance is <= \code{radius} using
+\code{dbscan::frNN} as the primary search. Query points are split into chunks and
+searched against the full coordinate set (\code{frNN(..., query=)}). Chunks run
+in parallel via fork on Unix to lower peak memory and wall time; neighbors
+match a single full \code{frNN} call after dropping self-hits from the query
+interface. Undirected edges are emitted once (\code{j > i}).
 }
 \keyword{internal}

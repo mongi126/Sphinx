@@ -7,18 +7,38 @@
 visualize_interaction_heatmap(
   interaction_matrix,
   transform = TRUE,
-  color_palette = viridis::inferno,
+  color_palette = NULL,
+  main = "Cell-Cell Interaction Frequency",
+  display_numbers = FALSE,
+  number_format = NULL,
+  cellwidth = 14,
+  cellheight = 14,
+  fontsize = 12,
   save_path = NULL,
   width = 10,
   height = 8
 )
 }
 \arguments{
-\item{interaction_matrix}{Interaction matrix from analyze_spatial_interactions()}
+\item{interaction_matrix}{Interaction matrix from analyze_spatial_interactions()
+(raw counts, enrichment, or abundance-normalized scores)}
 
-\item{transform}{Apply log2 transformation (default: TRUE)}
+\item{transform}{Apply log2(x+1) transformation (default: TRUE). Set FALSE
+for enrichment / abundance-normalized matrices.}
 
-\item{color_palette}{Color palette function (default: viridis::inferno)}
+\item{color_palette}{Color palette function (default: soft sequential)}
+
+\item{main}{Heatmap title}
+
+\item{display_numbers}{Whether to show numbers in cells (default: FALSE)}
+
+\item{number_format}{sprintf format for cell labels (default: auto)}
+
+\item{cellwidth}{Cell width in points (default: 14)}
+
+\item{cellheight}{Cell height in points (default: 14)}
+
+\item{fontsize}{Base font size (default: 12)}
 
 \item{save_path}{Output file path (optional)}
 
@@ -35,9 +55,11 @@ Visualize cell-cell interaction matrix
 \examples{
 \donttest{
 df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 intx <- analyze_spatial_interactions(df, edges)
 visualize_interaction_heatmap(intx$interaction_matrix,
   save_path = tempfile(fileext = ".pdf"))
+visualize_interaction_heatmap(intx$enrichment_matrix, transform = FALSE,
+  main = "Abundance-normalized contact enrichment")
 }
 }

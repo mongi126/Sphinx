@@ -12,16 +12,23 @@
 \item{n}{number of cells}
 }
 \value{
-list with \code{method} (character) and \code{params} (list of recommended parameters)
+list with \code{method}, \code{params}, and \code{reason}
 }
 \description{
-Decision tree (when called from \code{method = "auto"}):
+Empirical decision tree for \code{method = "auto"}, calibrated on a multi-cohort
+within-sample composite (PAS, SI_expr, speed) across ~180 FOVs. Rules are
+applied in order; first match wins:
 \enumerate{
-\item n > 50000 -> window
-\item cat_morans_I >= 0.4 -> radius (strong type clustering)
-\item cv_nn_dist < 0.3 -> knn (CSR-like)
-or radius (mild deviation from CSR within the same band)
-\item otherwise -> delaunay (fallback)
+\item Tiled / blocked-like FOV (ordered Clark-Evans R > 1.15 and uniform
+density CV < 0.3, n < 5e4) -> \code{window} with knn(k=10, mutual).
+\item Strong type clustering (\code{cat_morans_I >= 0.4}) \strong{and} fairly uniform
+density (\code{cv_nn_dist < 0.3}) -> \code{radius} at ~3x median 1-NN.
+\item Continuous epithelium / few holes: large n (\verb{>= 2e5}), heterogeneous
+density (\code{cv >= 0.6}), or space-filling irregular layout -> \code{delaunay}
+with optional \code{max_edge_length = "auto"}.
+\item Otherwise baseline -> \code{knn} with \code{n_neighbors = 10}, \code{require_mutual = TRUE}.
 }
+Scoring parallelism (\code{n_jobs}) is an evaluation concern, not encoded here;
+builders still use \code{n_cores}.
 }
 \keyword{internal}

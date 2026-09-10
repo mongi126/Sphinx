@@ -1,12 +1,7 @@
 # Generate color palette for visualizations
 
-Creates optimized color palettes:
-
-1.  Small sets: ColorBrewer Set1
-
-2.  Medium sets: Set3
-
-3.  Large sets: Hue palette Ensures distinct colors for all categories
+Soft candy colors that stay distinct (no neon / fluorescent hues).
+Continuous heatmaps keep the pink sequential ramp unchanged.
 
 ## Usage
 
@@ -16,10 +11,16 @@ get_color_palette(n)
 
 ## Arguments
 
-- n:
-
-  Number of colors needed
+  - n:
+    
+    Number of colors needed
 
 ## Value
 
 Vector of color codes
+
+## Examples
+
+``` r
+get_color_palette(5)
+```

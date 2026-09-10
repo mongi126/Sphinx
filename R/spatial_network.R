@@ -162,7 +162,10 @@ calculate_optimal_radius <- function(df,
   ))
 }
 
-#' Calculate optimal window size (Stereopy CCD-style)
+#' Calculate an adaptive window size from cell density
+#'
+#' Iteratively adjusts window side length so that the mean number of cells per
+#' window falls between `min_cells` and `max_cells`.
 #'
 #' @param df Spatial data with coordinates
 #' @param x_col Column name for X coordinates (default: "X")
@@ -192,7 +195,7 @@ calculate_optimal_window_size <- function(df,
   if (length(x) < 1L) {
     stop("No valid coordinates after removing NAs.")
   }
-  res <- .calc_stereopy_window_size(
+  res <- .calc_adaptive_window_size(
     x, y,
     min_cells = min_cells,
     max_cells = max_cells,
@@ -213,7 +216,7 @@ calculate_optimal_window_size <- function(df,
 #' @param df Spatial data with coordinates and cell types
 #' @param x_col Column name for X coordinates (default: "X")
 #' @param y_col Column name for Y coordinates (default: "Y")
-#' @param celltype_col Column name for cell types (default: "annotation")
+#' @param celltype_col Column name for cell types (default: "celltype")
 #' @return List with distance matrix and distributions
 #' @examples
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
@@ -223,7 +226,7 @@ calculate_optimal_window_size <- function(df,
 calculate_celltype_distances <- function(df,
                                          x_col = "X",
                                          y_col = "Y",
-                                         celltype_col = "annotation") {
+                                         celltype_col = "celltype") {
   if (!requireNamespace("RANN", quietly = TRUE)) {
     stop("Package 'RANN' is required.")
   }
@@ -300,20 +303,73 @@ calculate_celltype_distances <- function(df,
 #'
 #' This function builds a cell-cell spatial network using one of four methods
 #' ("radius", "knn", "delaunay", "window"). When `method = "auto"`, it
-#' selects the method based on robust spatial metrics computed from the data.
+#' selects the method from within-sample spatial metrics using an empirical
+#' decision tree (multi-cohort network evaluation; see `.select_method()`):
+#' baseline knn(k=10, mutual); radius when types are strongly clustered and
+#' density is fairly uniform; delaunay for continuous / large / heterogeneous
+#' layouts (optional length gate); window only for ordered tiled-like FOVs.
+#'
+#' By default there is **no** distance gate for knn / delaunay / window (same
+#' idea as leaving `max_dist` unset), except that `method = "auto"` may
+#' recommend `max_edge_length = "auto"` for delaunay. Optionally set
+#' `max_dist` (absolute), a numeric `max_edge_length`, or
+#' `max_edge_length = "auto"` (upper quantile of per-cell k-th NN distances)
+#' to drop long edges. Each cell can also be limited to its `n_neighbors` /
+#' `max_degree` nearest contacts.
 #'
 #' @param df data.frame/data.table with columns: X, Y, Cell_ID; optional cell type column
 #' @param method one of c("auto","radius","knn","delaunay","window")
-#' @param k integer, neighbors for knn/window methods (default chosen automatically)
+#' @param k **deprecated** neighbor count. Use `n_neighbors`. Clustering `k`
+#'   belongs to `cluster_neighborhoods()`, not this function.
 #' @param radius numeric, search radius for radius method (auto if NULL)
-#' @param window_size numeric, grid side length for window method (auto if NULL)
-#' @param max_edges integer, hard cap on number of returned edges (may be downsampled)
+#' @param window_size numeric, sliding-window side length for window method
+#'   (auto if NULL). Stereopy CCD: target 30-50 cells per window.
+#' @param window_slide_step numeric, stride of the sliding window. `NULL`
+#'   (default) uses half of `window_size`, as in Stereopy CCD.
+#' @param max_edge_length distance gate. `NULL` / `Inf` (default): no gate for
+#'   knn/delaunay/window. Numeric: keep edges with `dist <=` this value.
+#'   `"auto"`: use `edge_length_quantile` of per-cell k-th NN distances
+#'   (scaled by `edge_length_mult`). For `method = "radius"`, the search
+#'   radius itself is the gate.
+#' @param max_dist numeric absolute distance cap in the same units as X/Y.
+#'   If set, overrides `max_edge_length`.
+#' @param edge_length_mult numeric multiplier for `max_edge_length = "auto"`
+#'   (default 1.0). Ignored unless auto gating is requested.
+#' @param edge_length_quantile quantile of per-cell k-th NN distances when
+#'   `max_edge_length = "auto"` (default 0.95).
+#' @param n_neighbors integer number of spatial neighbors (knn/window search
+#'   rank and post-filter degree cap). Default `10` for knn/window (aligned
+#'   with `.default_nn_rank()` and the auto baseline). For
+#'   `method = "radius"` or `"delaunay"`, omitted/`NULL` means no degree cap
+#'   (`Inf`: keep the ball graph / triangulation). Alias of `max_degree`.
+#'   This is **not** the clustering `k` used by `cluster_neighborhoods()`.
+#' @param max_degree integer. Alias of `n_neighbors`. Used only when
+#'   `n_neighbors` is not supplied. If both are set, `n_neighbors` wins.
+#'   Set `Inf` to disable degree capping.
+#' @param require_mutual logical. If TRUE, keep an edge only when both cells list
+#'   each other among their `n_neighbors` nearest contacts. Default `TRUE` for
+#'   knn/window (auto baseline). For `method = "radius"` defaults to `FALSE`
+#'   unless set explicitly. Delaunay edges are already mutual; the flag only
+#'   matters if a degree cap is also set.
+#' @param max_edges deprecated; ignored. Edges are filtered by distance and
+#'   per-cell degree only (no global random downsampling).
+#' @param n_cores integer parallel workers for knn / radius construction. NULL
+#'   uses `SPHINX_N_CORES` if set, otherwise up to 8 detected cores (fork on Unix).
+#'   Also passed as `num.threads` to kNN search when using a single chunk.
 #' @param celltype_col character, column with cell-type labels (optional)
 #' @param verbose logical, print decisions and key metrics
 #' @return data.table with columns: from, to, dist (and optional context columns)
 #' @examples
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
+#' # Optional absolute distance gate (same units as X/Y):
+#' edges2 <- build_spatial_network(
+#'   df, method = "knn", n_neighbors = 10, max_dist = 40, verbose = FALSE
+#' )
+#' # Optional adaptive gate (quantile of k-th NN distances):
+#' edges3 <- build_spatial_network(
+#'   df, method = "knn", n_neighbors = 10, max_edge_length = "auto", verbose = FALSE
+#' )
 #' head(edges)
 #' @export
 build_spatial_network <- function(
@@ -322,7 +378,16 @@ build_spatial_network <- function(
     k = NULL,
     radius = NULL,
     window_size = NULL,
-    max_edges = 1e6,
+    window_slide_step = NULL,
+    max_edge_length = NULL,
+    max_dist = NULL,
+    edge_length_mult = 1.0,
+    edge_length_quantile = 0.95,
+    n_neighbors = 10L,
+    max_degree = NULL,
+    require_mutual = TRUE,
+    max_edges = NULL,
+    n_cores = NULL,
     celltype_col = "celltype",
     verbose = TRUE
 ) {
@@ -348,55 +413,205 @@ build_spatial_network <- function(
 
   # ---- Calculate spatial metrics (guide auto choices + sensible defaults) ----
   metrics <- .calc_spatial_metrics(df, celltype_col = celltype_col)
+  contact_1nn <- metrics$median_1nn_dist
+  if (!is.finite(contact_1nn) || contact_1nn <= 0) {
+    contact_1nn <- metrics$mean_nn_dist
+  }
+
+  # n_neighbors = spatial neighbor count (knn/window rank + degree cap).
+  # k is clustering-only (cluster_neighborhoods). Old calls that passed k as
+  # neighbor count are still accepted with a warning.
+  # Default n_neighbors=10 must not overwrite an explicit max_degree.
+  user_set_n_neighbors <- !missing(n_neighbors) && !is.null(n_neighbors)
+  user_set_max_degree <- !missing(max_degree) && !is.null(max_degree)
+  user_set_degree <- user_set_n_neighbors || user_set_max_degree
+  user_set_mutual <- !missing(require_mutual)
+  user_set_mel <- !missing(max_edge_length)
+  user_set_radius <- !missing(radius) && !is.null(radius)
+  if (!is.null(k)) {
+    warning(
+      "`k` in build_spatial_network() is deprecated for neighbor count. ",
+      "Use n_neighbors. Clustering k belongs to cluster_neighborhoods().",
+      call. = FALSE
+    )
+    if (!user_set_degree) {
+      n_neighbors <- as.integer(k)
+      user_set_n_neighbors <- TRUE
+      user_set_degree <- TRUE
+    }
+  }
+
+  if (user_set_n_neighbors) {
+    max_degree <- n_neighbors
+  } else if (!user_set_max_degree) {
+    max_degree <- if (!is.null(n_neighbors)) n_neighbors else .default_nn_rank()
+  }
+  if (is.finite(max_degree)) {
+    max_degree <- as.integer(max_degree)
+    if (max_degree < 1L) {
+      stop("n_neighbors / max_degree must be >= 1, or Inf to disable.")
+    }
+  }
+  # Neighbor rank used by knn / window builders (not clustering).
+  nn_k <- if (is.finite(max_degree)) max_degree else .default_nn_rank()
 
   # ---- Auto method selection (returns method + recommended params) ----
   chosen <- method
   auto_params <- list()
+  auto_reason <- NULL
   if (method == "auto") {
     sel <- .select_method(metrics, nrow(df))
     chosen <- sel$method
     auto_params <- sel$params
+    auto_reason <- sel$reason
   }
 
-  # Resolve parameters: user override > auto recommendation > generic default
-  if (is.null(k)) {
-    k <- if (!is.null(auto_params$k)) {
-      auto_params$k
-    } else {
-      max(4, min(30, round(8 + log10(max(10, nrow(df))) * 4)))
-    }
+  if (is.null(edge_length_mult) || !is.finite(edge_length_mult) || edge_length_mult <= 0) {
+    edge_length_mult <- 1.0
   }
+  if (is.null(edge_length_quantile) || !is.finite(edge_length_quantile) ||
+      edge_length_quantile <= 0 || edge_length_quantile > 1) {
+    edge_length_quantile <- 0.95
+  }
+  if (!is.null(auto_params$n_neighbors) && is.finite(auto_params$n_neighbors) &&
+      !user_set_degree) {
+    nn_k <- as.integer(auto_params$n_neighbors)
+    max_degree <- nn_k
+  }
+  if (!is.null(auto_params$require_mutual) && !user_set_mutual) {
+    require_mutual <- isTRUE(auto_params$require_mutual)
+  }
+  if (!is.null(auto_params$max_edge_length) && !user_set_mel) {
+    max_edge_length <- auto_params$max_edge_length
+  }
+  if (!is.null(auto_params$radius) && !user_set_radius) {
+    radius <- auto_params$radius
+  }
+
+  # Distance gate (optional). Default: none for knn/delaunay/window.
+  # Priority: max_dist > max_edge_length ("auto" | numeric) > Inf.
+  mel_auto <- FALSE
+  if (!is.null(max_dist) && is.finite(max_dist)) {
+    if (!is.null(max_edge_length) && !identical(max_edge_length, "auto") &&
+        is.finite(suppressWarnings(as.numeric(max_edge_length)[1L])) &&
+        !isTRUE(all.equal(as.numeric(max_dist), as.numeric(max_edge_length)))) {
+      warning(
+        "Both max_dist and max_edge_length were set; using max_dist=",
+        max_dist, " (absolute)."
+      )
+    }
+    max_edge_length <- as.numeric(max_dist)
+  } else if (is.null(max_edge_length)) {
+    if (identical(chosen, "radius")) {
+      # Filled from search radius below.
+      max_edge_length <- NA_real_
+    } else {
+      max_edge_length <- Inf
+    }
+  } else if (is.character(max_edge_length) &&
+             tolower(max_edge_length[[1L]]) %in% c("auto", "quantile")) {
+    mel_auto <- TRUE
+    k_for_gate <- if (identical(chosen, "delaunay")) {
+      6L
+    } else if (identical(chosen, "radius")) {
+      .default_nn_rank()
+    } else {
+      as.integer(nn_k)
+    }
+    max_edge_length <- .default_max_edge_length(
+      as.matrix(df[, .(X, Y)]),
+      k = k_for_gate,
+      quantile = edge_length_quantile,
+      multiplier = edge_length_mult
+    )
+  } else {
+    max_edge_length <- suppressWarnings(as.numeric(max_edge_length)[1L])
+    if (!is.finite(max_edge_length)) max_edge_length <- Inf
+  }
+
   if (is.null(radius)) {
     radius <- if (!is.null(auto_params$radius)) {
       auto_params$radius
+    } else if (identical(chosen, "radius")) {
+      .default_search_radius(contact_1nn, multiplier = 3)
     } else {
-      .default_search_radius(metrics$mean_nn_dist)
+      # Metadata only for non-radius methods when no distance gate is set.
+      if (is.finite(max_edge_length)) {
+        max_edge_length
+      } else {
+        .default_search_radius(contact_1nn, multiplier = 3)
+      }
     }
   }
+  if (chosen == "radius") {
+    if (!is.finite(max_edge_length) || is.na(max_edge_length)) {
+      # Radius graph is already a ball of radius `radius`.
+      max_edge_length <- radius
+    } else {
+      # Optional tighter numeric / auto / max_dist gate on top of the ball.
+      max_edge_length <- min(as.numeric(max_edge_length), as.numeric(radius))
+    }
+  }
+
+  # Radius: all pairs with dist <= R. Delaunay: keep the triangulation.
+  # Apply degree / mutual caps only if the user set them.
+  if (identical(chosen, "radius") || identical(chosen, "delaunay")) {
+    if (!user_set_degree) max_degree <- Inf
+    if (!user_set_mutual && identical(chosen, "radius")) require_mutual <- FALSE
+  }
+
+  # window_size / window_slide_step: Stereopy CCD sliding window (d, s=d/2).
   if (is.null(window_size)) {
     if (!is.null(auto_params$window_size)) {
       window_size <- auto_params$window_size
-      window_slide_step <- auto_params$window_slide_step
-    } else {
-      opt_win <- .calc_stereopy_window_size(df$X, df$Y)
+      if (is.null(window_slide_step)) {
+        window_slide_step <- auto_params$window_slide_step
+      }
+    } else if (identical(chosen, "window") || identical(method, "auto")) {
+      opt_win <- .calc_adaptive_window_size(df$X, df$Y)
       window_size <- opt_win$window_size
-      window_slide_step <- opt_win$sliding_step
+      if (is.null(window_slide_step)) {
+        window_slide_step <- opt_win$sliding_step
+      }
+    } else {
+      xr <- diff(range(df$X, na.rm = TRUE))
+      yr <- diff(range(df$Y, na.rm = TRUE))
+      window_size <- max(10, min(xr, yr) / 40)
+      if (is.null(window_slide_step)) window_slide_step <- window_size / 2
     }
-  } else {
-    window_slide_step <- max(1L, as.integer(window_size) %/% 2L)
+  } else if (is.null(window_slide_step)) {
+    window_slide_step <- as.numeric(window_size) / 2
   }
-  if (is.null(window_slide_step)) {
-    window_slide_step <- max(1L, as.integer(window_size) %/% 2L)
+  if (is.null(window_slide_step) || !is.finite(window_slide_step) ||
+      window_slide_step <= 0) {
+    window_slide_step <- as.numeric(window_size) / 2
   }
-  max_edge_length <- auto_params$max_edge_length
 
   if (verbose) {
+    if (identical(method, "auto") && !is.null(auto_reason) && nzchar(auto_reason)) {
+      message("auto -> ", chosen, " | ", auto_reason)
+    }
+    mel_msg <- if (is.finite(max_edge_length)) {
+      paste0(
+        round(max_edge_length, 3),
+        if (isTRUE(mel_auto)) " (auto)" else if (!is.null(max_dist) && is.finite(max_dist)) " (max_dist)" else ""
+      )
+    } else {
+      "Inf (none)"
+    }
     msg <- paste0(
       "Method=", chosen,
       " | n=", nrow(df),
       " | radius=", round(radius,3),
       " | window_size=", round(window_size,3),
-      " | meanNN=", round(metrics$mean_nn_dist,3),
+      if (identical(chosen, "window")) {
+        paste0(" | window_slide_step=", round(window_slide_step, 3))
+      } else {
+        ""
+      },
+      " | max_edge_length=", mel_msg,
+      " | median1NN=", round(contact_1nn,3),
+      " | meanNN10=", round(metrics$mean_nn_dist,3),
       " | cvNN=", round(metrics$cv_nn_dist,3),
       " | CE_R=", round(metrics$clark_evans_R,3),
       " | CatMoranI=", round(metrics$cat_morans_I,3),
@@ -408,15 +623,35 @@ build_spatial_network <- function(
   # ---- Build base edges ----
   edges <- switch(
     chosen,
-    knn      = .edges_knn(df, k = k),
-    radius   = .edges_radius(df, radius = radius, k_cap = max(20, k * 3)),
-    delaunay = .edges_delaunay(df, max_edge_length = max_edge_length),
-    window   = .edges_window(df, k = min(k, 10), tile = window_size),
+    knn      = .edges_knn(df, k = nn_k, max_edge_length = max_edge_length,
+                          n_cores = n_cores),
+    radius   = .edges_radius(df, radius = radius, n_cores = n_cores),
+    delaunay = .edges_delaunay(df, max_edge_length = max_edge_length, k = nn_k),
+    window   = .edges_window(
+      df, k = nn_k, tile = window_size,
+      sliding_step = window_slide_step,
+      max_edge_length = max_edge_length
+    ),
     stop("Unknown method: ", chosen)
   )
 
+  if (!is.null(max_edges) && is.finite(max_edges)) {
+    warning(
+      "max_edges is deprecated and ignored; edges are filtered by ",
+      "max_edge_length / max_dist + n_neighbors (no random downsampling)."
+    )
+  }
+
+  edges <- .filter_edges_biological(
+    edges,
+    max_edge_length = max_edge_length,
+    max_degree = max_degree,
+    require_mutual = isTRUE(require_mutual),
+    verbose = verbose
+  )
+
   if (nrow(edges) == 0L) {
-    warning("No edges produced; try increasing k/radius/window_size.")
+    warning("No edges produced; try increasing n_neighbors/radius/window_size/max_edge_length/max_dist.")
     return(edges)
   }
 
@@ -428,23 +663,34 @@ build_spatial_network <- function(
     edges[, same_type := (from_type == to_type)]
   }
 
-  # ---- Cap edges (distance-weighted sampling) ----
-  if (nrow(edges) > max_edges) {
-    if (verbose) message("Downsampling edges: ", nrow(edges), " -> ", max_edges)
-    w <- 1 / (edges$dist + .Machine$double.eps)
-    w <- w / sum(w)
-    idx <- sample.int(nrow(edges), size = max_edges, replace = FALSE, prob = w)
-    edges <- edges[idx]
-  }
-
   data.table::setattr(edges, "metrics", metrics)
   data.table::setattr(edges, "method", chosen)
   data.table::setattr(edges, "parameters", list(
-    k = k,
+    n_neighbors = max_degree,
     radius = radius,
     window_size = window_size,
     window_slide_step = window_slide_step,
-    max_edge_length = max_edge_length
+    max_edge_length = max_edge_length,
+    max_dist = if (!is.null(max_dist) && is.finite(max_dist)) as.numeric(max_dist) else NA_real_,
+    edge_length_mult = edge_length_mult,
+    edge_length_quantile = edge_length_quantile,
+    distance_gate = if (!is.null(max_dist) && is.finite(max_dist)) {
+      "max_dist"
+    } else if (isTRUE(mel_auto)) {
+      "auto_quantile"
+    } else if (is.finite(max_edge_length) && !identical(chosen, "radius")) {
+      "max_edge_length"
+    } else if (identical(chosen, "radius")) {
+      "radius"
+    } else {
+      "none"
+    },
+    contact_1nn_median = contact_1nn,
+    max_degree = max_degree,
+    require_mutual = isTRUE(require_mutual),
+    n_cores = .sphinx_default_cores(n_cores),
+    auto_requested = identical(method, "auto"),
+    auto_reason = auto_reason
   ))
   data.table::setkey(edges, from, to)
 
@@ -474,13 +720,138 @@ build_spatial_network <- function(
   nn$nn.dists[, k_query]
 }
 
-#' Default search radius from mean NN distance
-#' @param mean_nn_dist mean k-th nearest-neighbor distance
-#' @param multiplier scale factor (default: 2.0)
+#' Default search radius from local spacing (median 1-NN x multiplier)
+#' @param mean_nn_dist local spacing distance
+#' @param multiplier scale factor (default: 3 ~ a few cell spacings)
 #' @return numeric search radius
 #' @keywords internal
-.default_search_radius <- function(mean_nn_dist, multiplier = 2.0) {
+.default_search_radius <- function(mean_nn_dist, multiplier = 3) {
   mean_nn_dist * multiplier
+}
+
+#' Default maximum edge length from the k-th NN distance distribution
+#'
+#' Uses the upper quantile of each cell's distance to its k-th nearest neighbor.
+#' This matches the natural length scale of a kNN / local triangulation graph:
+#' typical neighborhoods are kept, while only sparse-region outliers are cut.
+#' (A cap of ~1.5xmedian(1-NN) is far too tight once k >= 5-10.)
+#'
+#' @param coords numeric matrix with X/Y columns (or a single spacing scalar for
+#'   backward-compatible callers - then treated as median 1-NN x 3)
+#' @param k neighbor rank used for the distance distribution (default 10)
+#' @param quantile upper quantile in (0, 1] (default 0.95)
+#' @param multiplier optional scale on the quantile (default 1)
+#' @return numeric max edge length
+#' @keywords internal
+.default_max_edge_length <- function(coords,
+                                     k = .default_nn_rank(),
+                                     quantile = 0.95,
+                                     multiplier = 1) {
+  if (is.null(multiplier) || !is.finite(multiplier) || multiplier <= 0) {
+    multiplier <- 1
+  }
+  # Backward compatible: scalar spacing -> contact-scale fallback
+  if (is.numeric(coords) && length(coords) == 1L) {
+    return(as.numeric(coords) * 3 * multiplier)
+  }
+  k <- as.integer(k)
+  if (!is.finite(k) || k < 1L) k <- .default_nn_rank()
+  if (is.null(quantile) || !is.finite(quantile) || quantile <= 0 || quantile > 1) {
+    quantile <- 0.95
+  }
+  dk <- .nn_dist_at_rank(coords, k_nn = k)
+  thr <- as.numeric(stats::quantile(dk, probs = quantile, na.rm = TRUE, names = FALSE))
+  if (!is.finite(thr) || thr <= 0) {
+    thr <- stats::median(dk, na.rm = TRUE)
+  }
+  thr * multiplier
+}
+
+#' Filter edges by optional distance and degree rules
+#'
+#' Rules (no global random downsampling):
+#' 1. Distance (optional): if `max_edge_length` is finite, keep edges with
+#'    dist <= max_edge_length.
+#' 2. Neighbor cap: each cell keeps at most `max_degree` / `n_neighbors`
+#'    nearest contacts (default 10 for non-radius methods).
+#' 3. Optional mutual filter: if `require_mutual`, keep an edge only when both
+#'    endpoints nominate each other (reciprocal contact).
+#'
+#' @param edges data.table with from, to, dist
+#' @param max_edge_length numeric distance cap (Inf to skip)
+#' @param max_degree integer per-cell neighbor cap (Inf to skip); aka n_neighbors
+#' @param require_mutual logical; mutual nearest neighbors if TRUE
+#' @param verbose logical
+#' @return filtered data.table with from, to, dist
+#' @keywords internal
+.filter_edges_biological <- function(edges,
+                                     max_edge_length = Inf,
+                                     max_degree = 10L,
+                                     require_mutual = TRUE,
+                                     verbose = FALSE) {
+  if (is.null(edges) || !nrow(edges)) return(edges)
+  if (!data.table::is.data.table(edges)) {
+    edges <- data.table::as.data.table(edges)
+  }
+  n0 <- nrow(edges)
+
+  if (is.finite(max_edge_length)) {
+    edges <- edges[is.finite(dist) & dist <= max_edge_length]
+  }
+  n1 <- nrow(edges)
+  if (!nrow(edges)) {
+    if (verbose) {
+      message("Biological edge filter: ", n0, " -> 0 (all edges beyond contact distance)")
+    }
+    return(edges[, .(from, to, dist)])
+  }
+
+  if (is.null(max_degree) || !is.finite(max_degree) || max_degree < 1) {
+    if (verbose && n0 != n1) {
+      message(
+        "Distance filter: ", n0, " -> ", n1,
+        " (max_edge_length=", round(max_edge_length, 3), ")"
+      )
+    }
+    return(edges[, .(from, to, dist)])
+  }
+
+  max_degree <- as.integer(max_degree)
+  d <- data.table::rbindlist(list(
+    edges[, .(cell = as.character(from), nbr = as.character(to), dist)],
+    edges[, .(cell = as.character(to), nbr = as.character(from), dist)]
+  ), use.names = TRUE)
+  data.table::setorder(d, cell, dist)
+  d[, ord := seq_len(.N), by = cell]
+  d <- d[ord <= max_degree]
+  d[, key := paste(pmin(cell, nbr), pmax(cell, nbr), sep = "\t")]
+  key_n <- d[, .N, by = key]
+  if (isTRUE(require_mutual)) {
+    keep <- key_n[N >= 2L, key]
+  } else {
+    keep <- key_n$key
+  }
+  if (!length(keep)) {
+    return(edges[0L, .(from, to, dist)])
+  }
+  out <- d[key %in% keep, .(dist = min(dist)), by = key]
+  split_key <- strsplit(out$key, "\t", fixed = TRUE)
+  out[, `:=`(
+    from = vapply(split_key, `[[`, character(1), 1L),
+    to = vapply(split_key, `[[`, character(1), 2L),
+    key = NULL
+  )]
+
+  if (verbose) {
+    mel <- if (is.finite(max_edge_length)) round(max_edge_length, 3) else "Inf"
+    message(
+      "Biological edge filter: ", n0, " -> ", nrow(out),
+      " (max_edge_length=", mel,
+      ", n_neighbors=", max_degree,
+      ", require_mutual=", isTRUE(require_mutual), ")"
+    )
+  }
+  out[, .(from, to, dist)]
 }
 
 #' Round to the nearest even integer (minimum 2)
@@ -490,7 +861,7 @@ build_spatial_network <- function(
   max(2L, as.integer(r))
 }
 
-#' Number of grid windows covering the spatial extent (Stereopy-style binning)
+#' Number of grid windows covering the spatial extent
 #' @keywords internal
 .n_grid_windows <- function(x, y, win_size) {
   xmin <- min(x, na.rm = TRUE)
@@ -508,9 +879,9 @@ build_spatial_network <- function(
   length(x) / .n_grid_windows(x, y, win_size)
 }
 
-#' Optimal window size via Stereopy CCD iterative adjustment
+#' Adaptive window size by iterative density targeting
 #' @keywords internal
-.calc_stereopy_window_size <- function(x,
+.calc_adaptive_window_size <- function(x,
                                        y,
                                        min_cells = 30L,
                                        max_cells = 50L,
@@ -650,6 +1021,7 @@ build_spatial_network <- function(
 
   # Clark-Evans R uses 1-NN distance (theoretical CSR expectation is for 1-NN)
   d1 <- RANN::nn2(coords, coords, k = 2)$nn.dists[, 2]
+  median_1nn <- stats::median(d1, na.rm = TRUE)
 
   # Clark-Evans R index under CSR: E[NN] = 0.5 / sqrt(lambda)
   rngX <- range(x_vals, na.rm = TRUE); rngY <- range(y_vals, na.rm = TRUE)
@@ -673,8 +1045,11 @@ build_spatial_network <- function(
   }
 
   list(
+    # mean distance to the 10th NN - used for density CV, NOT contact length
     mean_nn_dist = mean_nn,
     mean_nn_rank = k_nn,
+    # median 1-NN - contact / radius scale (not the knn distance gate)
+    median_1nn_dist = as.numeric(median_1nn),
     cv_nn_dist = cv_nn,
     clark_evans_R = clark_evans_R,
     cat_morans_I = cat_morans_I,
@@ -684,184 +1059,725 @@ build_spatial_network <- function(
 
 #' Select optimal method based on spatial metrics
 #'
-#' Decision tree (when called from `method = "auto"`):
+#' Empirical decision tree for `method = "auto"`, calibrated on a multi-cohort
+#' within-sample composite (PAS, SI_expr, speed) across ~180 FOVs. Rules are
+#' applied in order; first match wins:
 #' \enumerate{
-#'   \item n > 50000 -> window
-#'   \item cat_morans_I >= 0.4 -> radius (strong type clustering)
-#'   \item cv_nn_dist < 0.3 -> knn (CSR-like)
-#'     or radius (mild deviation from CSR within the same band)
-#'   \item otherwise -> delaunay (fallback)
+#'   \item Tiled / blocked-like FOV (ordered Clark-Evans R > 1.15 and uniform
+#'     density CV < 0.3, n < 5e4) -> `window` with knn(k=10, mutual).
+#'   \item Strong type clustering (`cat_morans_I >= 0.4`) **and** fairly uniform
+#'     density (`cv_nn_dist < 0.3`) -> `radius` at ~3x median 1-NN.
+#'   \item Continuous epithelium / few holes: large n (`>= 2e5`), heterogeneous
+#'     density (`cv >= 0.6`), or space-filling irregular layout -> `delaunay`
+#'     with optional `max_edge_length = "auto"`.
+#'   \item Otherwise baseline -> `knn` with `n_neighbors = 10`, `require_mutual = TRUE`.
 #' }
+#' Scoring parallelism (`n_jobs`) is an evaluation concern, not encoded here;
+#' builders still use `n_cores`.
 #'
 #' @param m spatial metrics
 #' @param n number of cells
-#' @return list with `method` (character) and `params` (list of recommended parameters)
+#' @return list with `method`, `params`, and `reason`
 #' @keywords internal
 .select_method <- function(m, n) {
   params <- list()
-
-  # 1) Large datasets -> windowed kNN
-  if (n > 50000L) {
-    params$k <- 6L
-    return(list(method = "window", params = params))
+  contact <- m$median_1nn_dist
+  if (is.null(contact) || !is.finite(contact) || contact <= 0) {
+    contact <- m$mean_nn_dist
   }
 
-  morans <- m$cat_morans_I
-
-  # 2) Strong spatial clustering of cell types -> radius
-  if (!is.na(morans) && morans >= 0.4) {
-    params$radius <- .default_search_radius(m$mean_nn_dist)
-    return(list(method = "radius", params = params))
-  }
-
-  if (is.na(morans)) {
-    warning("Categorical Moran's I unavailable; treating as weak clustering (< 0.4).")
-  }
-
-  # 3) Uniform density + CSR-like layout -> knn or radius
-  cv_ok <- !is.na(m$cv_nn_dist) && m$cv_nn_dist < 0.3
+  cv <- m$cv_nn_dist
   ce_r <- m$clark_evans_R
-  ce_ok <- !is.na(ce_r) && ce_r >= 0.85 && ce_r <= 1.15
+  morans <- m$cat_morans_I
+  uniform_density <- !is.na(cv) && is.finite(cv) && cv < 0.3
+  hetero_density <- !is.na(cv) && is.finite(cv) && cv >= 0.6
+  ordered_layout <- !is.na(ce_r) && is.finite(ce_r) && ce_r > 1.15
+  space_filling_irregular <- !is.na(ce_r) && is.finite(ce_r) && ce_r < 0.95 &&
+    !is.na(cv) && is.finite(cv) && cv >= 0.35 && n >= 10000L
 
-  if (cv_ok && ce_ok) {
-    if (ce_r >= 0.95 && ce_r <= 1.05) {
-      return(list(method = "knn", params = params))
-    }
-    params$radius <- .default_search_radius(m$mean_nn_dist)
-    return(list(method = "radius", params = params))
+  # 1) Tiled / blocked FOV (narrow proxy: ordered + uniform, not huge)
+  if (ordered_layout && uniform_density && n < 50000L) {
+    params$n_neighbors <- .default_nn_rank()
+    params$require_mutual <- TRUE
+    return(list(
+      method = "window",
+      params = params,
+      reason = sprintf(
+        "tiled/blocked-like (CE_R=%.3f>1.15, CV=%.3f<0.3, n=%s<5e4)",
+        ce_r, cv, format(n, scientific = FALSE)
+      )
+    ))
   }
 
-  # 4) Fallback -> Delaunay (parameter-light, robust on irregular layouts)
-  params$max_edge_length <- m$mean_nn_dist * 2
-  list(method = "delaunay", params = params)
+  # 2) Strong type clustering + fairly uniform density -> radius (~3x median 1-NN)
+  if (!is.na(morans) && is.finite(morans) && morans >= 0.4 && uniform_density) {
+    params$radius <- .default_search_radius(contact, multiplier = 3)
+    return(list(
+      method = "radius",
+      params = params,
+      reason = sprintf(
+        "type clustering + uniform density (MoranI=%.3f>=0.4, CV=%.3f<0.3; R~3xmedian1NN)",
+        morans, cv
+      )
+    ))
+  }
+
+  if (is.na(morans) || !is.finite(morans)) {
+    warning(
+      "Categorical Moran's I unavailable; skipping radius branch ",
+      "(requires MoranI>=0.4 with uniform density)."
+    )
+  }
+
+  # 3) Continuous epithelium / few holes -> delaunay (+ optional length gate)
+  continuous <- (n >= 200000L) ||
+    (hetero_density && n >= 5000L) ||
+    space_filling_irregular
+  if (continuous) {
+    params$max_edge_length <- "auto"
+    why <- if (n >= 200000L) {
+      sprintf("large continuous FOV (n=%s>=2e5)", format(n, scientific = FALSE))
+    } else if (hetero_density && n >= 5000L) {
+      sprintf("heterogeneous density (CV=%.3f>=0.6, n=%s)", cv, format(n, scientific = FALSE))
+    } else {
+      sprintf(
+        "space-filling irregular layout (CE_R=%.3f, CV=%.3f, n=%s)",
+        ce_r, cv, format(n, scientific = FALSE)
+      )
+    }
+    return(list(
+      method = "delaunay",
+      params = params,
+      reason = paste0(why, "; max_edge_length=auto")
+    ))
+  }
+
+  # 4) Baseline: knn(k=10, mutual=TRUE)
+  params$n_neighbors <- .default_nn_rank()
+  params$require_mutual <- TRUE
+  list(
+    method = "knn",
+    params = params,
+    reason = sprintf(
+      "baseline knn(k=%d, mutual=TRUE)%s",
+      as.integer(params$n_neighbors),
+      if (!is.na(morans) && is.finite(morans) && morans >= 0.4 && !uniform_density) {
+        sprintf(" (MoranI=%.3f but CV=%.3f not uniform -> skip radius)", morans, cv)
+      } else {
+        ""
+      }
+    )
+  )
 }
 
 #' Build edges using kNN method
+#'
+#' Exact k nearest neighbors via `BiocNeighbors::findKNN` (self excluded).
+#' Parallelism uses `num.threads` inside the search (fork-safe). For large
+#' point sets, query rows are processed in serial chunks via `subset=` so peak
+#' memory stays bounded; chunk results concatenate to the same neighbors as a
+#' single full call (no downsampling).
+#'
 #' @param df data.table with spatial data
 #' @param k number of neighbors
+#' @param max_edge_length optional maximum edge length filter
+#' @param n_cores parallel workers / search threads (NULL = auto)
 #' @return data.table with edges
 #' @keywords internal
-.edges_knn <- function(df, k) {
-  coords <- as.matrix(df[, .(X, Y)])
-  nn <- RANN::nn2(coords, coords, k = k + 1)
-  from_idx <- rep.int(seq_len(nrow(df)), k)
-  to_idx   <- as.vector(t(nn$nn.idx[, -1, drop = FALSE]))
-  d        <- as.vector(t(nn$nn.dists[, -1, drop = FALSE]))
+.edges_knn <- function(df, k, max_edge_length = NULL, n_cores = NULL) {
+  n <- nrow(df)
+  empty <- data.table::data.table(from = character(), to = character(), dist = numeric())
+  if (n < 2L) return(empty)
+  k <- as.integer(k)
+  if (!is.finite(k) || k < 1L) {
+    stop("k must be a positive integer for knn.")
+  }
+  k <- min(k, n - 1L)
 
-  ed <- data.table::data.table(
-    from = df$Cell_ID[from_idx],
-    to   = df$Cell_ID[to_idx],
-    dist = d
-  )
-  # Make undirected unique (keep shortest duplicate)
-  ed[, key := ifelse(from < to, paste(from,to), paste(to,from))]
+  if (!requireNamespace("BiocNeighbors", quietly = TRUE)) {
+    stop("Package 'BiocNeighbors' is required for knn. Please install it.")
+  }
+
+  coords <- as.matrix(df[, .(X, Y)])
+  storage.mode(coords) <- "double"
+  ids <- as.character(df$Cell_ID)
+  n_cores <- .sphinx_default_cores(n_cores)
+
+  # Serial chunks + internal threads: exact and avoids unsafe OpenMP+fork.
+  # Chunk when n is large to bound intermediate index/distance matrices.
+  chunk_size <- 50000L
+  if (n <= chunk_size) {
+    chunks <- list(seq_len(n))
+  } else {
+    n_chunks <- as.integer(ceiling(n / chunk_size))
+    chunks <- parallel::splitIndices(n, n_chunks)
+  }
+
+  parts <- vector("list", length(chunks))
+  for (ci in seq_along(chunks)) {
+    idx <- chunks[[ci]]
+    nn <- BiocNeighbors::findKNN(
+      coords,
+      k = k,
+      get.index = TRUE,
+      get.distance = TRUE,
+      num.threads = n_cores,
+      subset = idx
+    )
+    from_idx <- rep(idx, each = k)
+    to_idx <- as.vector(t(nn$index))
+    d <- as.vector(t(nn$distance))
+    parts[[ci]] <- data.table::data.table(
+      from = ids[from_idx],
+      to = ids[to_idx],
+      dist = d
+    )
+  }
+  ed <- data.table::rbindlist(parts, use.names = TRUE)
+  if (!nrow(ed)) return(empty)
+
+  if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
+    ed <- ed[dist <= max_edge_length]
+  }
+  if (nrow(ed) == 0L) return(ed)
+  ed[, key := ifelse(from < to, paste(from, to), paste(to, from))]
   ed <- ed[order(key, dist)][!duplicated(key)][, key := NULL][]
   ed
 }
 
-#' Build edges using radius method
+#' Build edges using radius method (exact ball graph)
+#'
+#' Connects every pair of cells whose Euclidean distance is <= `radius` using
+#' `dbscan::frNN` as the primary search. Query points are split into chunks and
+#' searched against the full coordinate set (`frNN(..., query=)`). Chunks run
+#' in parallel via fork on Unix to lower peak memory and wall time; neighbors
+#' match a single full `frNN` call after dropping self-hits from the query
+#' interface. Undirected edges are emitted once (`j > i`).
+#'
 #' @param df data.table with spatial data
 #' @param radius search radius
-#' @param k_cap maximum neighbors to consider
+#' @param n_cores parallel workers (NULL = auto)
 #' @return data.table with edges
 #' @keywords internal
-.edges_radius <- function(df, radius, k_cap = 50) {
+.edges_radius <- function(df, radius, n_cores = NULL) {
+  n <- nrow(df)
+  empty <- data.table::data.table(from = character(), to = character(), dist = numeric())
+  if (n < 2L || is.null(radius) || !is.finite(radius) || radius <= 0) {
+    return(empty)
+  }
+  if (!requireNamespace("dbscan", quietly = TRUE)) {
+    stop("Package 'dbscan' is required for radius graphs. Please install it.")
+  }
+
+  old_dt_threads <- data.table::getDTthreads()
+  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
+  data.table::setDTthreads(1L)
+
   coords <- as.matrix(df[, .(X, Y)])
-  # Expected neighbors ~ lambda * pi r^2; cap to k_cap for speed
-  rngX <- range(df$X); rngY <- range(df$Y)
-  area <- (diff(rngX) + 1e-8) * (diff(rngY) + 1e-8)
-  lambda <- nrow(df) / area
-  exp_deg <- max(5, min(k_cap, round(lambda * pi * radius^2)))
+  storage.mode(coords) <- "double"
+  ids <- as.character(df$Cell_ID)
+  r <- as.numeric(radius)
+  n_cores <- .sphinx_default_cores(n_cores)
 
-  nn <- RANN::nn2(coords, coords, k = exp_deg + 1)
-  from_idx <- rep.int(seq_len(nrow(df)), exp_deg)
-  to_idx   <- as.vector(t(nn$nn.idx[, -1, drop = FALSE]))
-  d        <- as.vector(t(nn$nn.dists[, -1, drop = FALSE]))
+  # Prefer more / smaller chunks under parallel to bound per-worker frNN lists.
+  n_chunks <- if (n_cores <= 1L) {
+    1L
+  } else {
+    max(as.integer(n_cores), min(n, as.integer(n_cores) * 4L))
+  }
+  n_chunks <- max(1L, min(n_chunks, n))
+  if (n_chunks <= 1L) {
+    chunks <- list(seq_len(n))
+  } else {
+    chunks <- parallel::splitIndices(n, n_chunks)
+  }
 
-  keep <- d <= radius
-  ed <- data.table::data.table(
-    from = df$Cell_ID[from_idx][keep],
-    to   = df$Cell_ID[to_idx][keep],
-    dist = d[keep]
-  )
-  ed[, key := ifelse(from < to, paste(from,to), paste(to,from))]
-  ed <- ed[order(key, dist)][!duplicated(key)][, key := NULL][]
+  worker <- function(idx) {
+    # query= returns neighbors in the full `x` index; may include self.
+    fr <- dbscan::frNN(
+      x = coords,
+      eps = r,
+      query = coords[idx, , drop = FALSE],
+      sort = TRUE
+    )
+    from_chunks <- list()
+    to_chunks <- list()
+    dist_chunks <- list()
+    ci <- 0L
+    for (j in seq_along(idx)) {
+      oi <- idx[[j]]
+      nbr <- fr$id[[j]]
+      d <- fr$dist[[j]]
+      if (!length(nbr)) next
+      keep <- nbr != oi
+      nbr <- nbr[keep]
+      d <- d[keep]
+      keep2 <- nbr > oi
+      if (!any(keep2)) next
+      ci <- ci + 1L
+      from_chunks[[ci]] <- rep.int(oi, sum(keep2))
+      to_chunks[[ci]] <- nbr[keep2]
+      dist_chunks[[ci]] <- d[keep2]
+    }
+    if (ci == 0L) return(empty)
+    data.table::data.table(
+      from = ids[unlist(from_chunks, use.names = FALSE)],
+      to = ids[unlist(to_chunks, use.names = FALSE)],
+      dist = unlist(dist_chunks, use.names = FALSE)
+    )
+  }
+
+  parts <- .sphinx_lapply(chunks, worker, n_cores = n_cores)
+  ed <- data.table::rbindlist(parts, use.names = TRUE)
+  if (!nrow(ed)) return(empty)
   ed
+}
+
+#' Resolve parallel worker count for network builders
+#'
+#' Order: explicit `n_cores` > env `SPHINX_N_CORES` > min(detected cores, 8).
+#'
+#' @param n_cores optional integer
+#' @return integer >= 1
+#' @keywords internal
+.sphinx_default_cores <- function(n_cores = NULL) {
+  if (!is.null(n_cores) && length(n_cores) >= 1L) {
+    nc <- suppressWarnings(as.integer(n_cores[[1L]]))
+    if (is.finite(nc) && nc >= 1L) return(nc)
+  }
+  env <- suppressWarnings(as.integer(Sys.getenv("SPHINX_N_CORES", unset = "")))
+  if (length(env) == 1L && is.finite(env) && env >= 1L) return(env)
+  detected <- suppressWarnings(parallel::detectCores(logical = TRUE))
+  if (!is.finite(detected) || detected < 1L) return(1L)
+  max(1L, min(as.integer(detected), 8L))
+}
+
+#' lapply with optional fork parallelism (Unix); serial on Windows / n_cores=1
+#' @keywords internal
+.sphinx_lapply <- function(X, FUN, n_cores = 1L, ...) {
+  n_cores <- max(1L, as.integer(n_cores))
+  if (length(X) == 0L) return(list())
+  if (length(X) == 1L || n_cores <= 1L || .Platform$OS.type == "windows") {
+    return(lapply(X, FUN, ...))
+  }
+  parallel::mclapply(X, FUN, ..., mc.cores = min(n_cores, length(X)))
 }
 
 #' Build edges using Delaunay triangulation
+#'
+#' For large point sets, `deldir` (Fortran) fails with
+#' "long vectors are not supported in .Fortran". In that regime we tile the
+#' FOV into overlapping spatial chunks, triangulate each chunk, and merge
+#' undirected edges (deduplicated).
+#'
 #' @param df data.table with spatial data
 #' @param max_edge_length optional maximum edge length filter
+#' @param k neighbor count used only if `deldir` is missing (kNN fallback)
+#' @param chunk_max_points max points per chunk before tiling (default 2.5e5)
 #' @return data.table with edges
 #' @keywords internal
-.edges_delaunay <- function(df, max_edge_length = NULL) {
-  if (!requireNamespace("deldir", quietly = TRUE)) {
-    warning("Package 'deldir' not installed; falling back to kNN (k=6)")
-    return(.edges_knn(df, k = 6))
-  }
-  dd <- deldir::deldir(df$X, df$Y, suppressMsge = TRUE)
-  te <- deldir::triang.list(dd)
-  # Collect triangle edges
-  ed_list <- lapply(te, function(tri) {
-    idx <- tri$ptNum
-    matrix(c(idx[1],idx[2], idx[2],idx[3], idx[3],idx[1]), ncol=2, byrow=TRUE)
-  })
-  ed_idx <- do.call(rbind, ed_list)
-  ed_idx <- unique(t(apply(ed_idx, 1, function(x) sort(x))))
-  d <- sqrt((df$X[ed_idx[,1]] - df$X[ed_idx[,2]])^2 + (df$Y[ed_idx[,1]] - df$Y[ed_idx[,2]])^2)
-  ed <- data.table::data.table(
-    from = df$Cell_ID[ed_idx[,1]],
-    to   = df$Cell_ID[ed_idx[,2]],
-    dist = d
+.edges_delaunay <- function(df, max_edge_length = NULL, k = 6L,
+                            chunk_max_points = 250000L) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
   )
-  if (!is.null(max_edge_length)) {
+  n <- nrow(df)
+  if (n < 2L) return(empty)
+
+  chunk_max_points <- as.integer(chunk_max_points)
+  if (!is.finite(chunk_max_points) || chunk_max_points < 1000L) {
+    chunk_max_points <- 250000L
+  }
+
+  # Prefer Qhull (geometry::delaunayn) for large FOVs - deldir's Fortran
+  # backend hits "long vectors are not supported" around ~1e6 points.
+  if (n > chunk_max_points && requireNamespace("geometry", quietly = TRUE)) {
+    ed <- tryCatch(
+      .edges_delaunay_qhull(df, max_edge_length = max_edge_length),
+      error = function(e) {
+        message(
+          "geometry::delaunayn failed (", conditionMessage(e),
+          "); falling back to chunked deldir."
+        )
+        NULL
+      }
+    )
+    if (!is.null(ed)) return(ed)
+  }
+
+  if (!requireNamespace("deldir", quietly = TRUE)) {
+    kk <- if (!is.null(k) && is.finite(k) && as.integer(k) >= 1L) as.integer(k) else 6L
+    warning("Package 'deldir' not installed; falling back to kNN (k=", kk, ")")
+    return(.edges_knn(df, k = kk, max_edge_length = max_edge_length))
+  }
+
+  if (n <= chunk_max_points) {
+    ed <- tryCatch(
+      .edges_delaunay_deldir_block(df, max_edge_length = max_edge_length),
+      error = function(e) {
+        if (!grepl("long vectors|Fortran", conditionMessage(e), ignore.case = TRUE)) {
+          stop(e)
+        }
+        message(
+          "deldir failed on n=", n, " (", conditionMessage(e),
+          "); retrying with spatial chunks."
+        )
+        .edges_delaunay_chunked(
+          df,
+          max_edge_length = max_edge_length,
+          chunk_max_points = min(chunk_max_points, max(5000L, n %/% 4L))
+        )
+      }
+    )
+    return(ed)
+  }
+
+  message(
+    "Delaunay: n=", n, " - using overlapping spatial deldir chunks",
+    " (chunk_max_points=", chunk_max_points, ")"
+  )
+  .edges_delaunay_chunked(
+    df,
+    max_edge_length = max_edge_length,
+    chunk_max_points = chunk_max_points
+  )
+}
+
+#' Qhull Delaunay via geometry::delaunayn (handles ~1e6 points)
+#' @keywords internal
+.edges_delaunay_qhull <- function(df, max_edge_length = NULL) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
+  )
+  n <- nrow(df)
+  if (n < 2L) return(empty)
+  message("Delaunay: n=", n, " via geometry::delaunayn (Qhull)")
+  xy <- cbind(as.numeric(df$X), as.numeric(df$Y))
+  # QJ: joggle inputs to avoid precision issues on near-cocircular points
+  tri <- geometry::delaunayn(xy, options = "QJ")
+  if (is.null(tri) || !nrow(tri)) return(empty)
+  # each row = triangle vertex indices (1-based)
+  e1 <- c(tri[, 1], tri[, 2], tri[, 3])
+  e2 <- c(tri[, 2], tri[, 3], tri[, 1])
+  lo <- pmin(e1, e2)
+  hi <- pmax(e1, e2)
+  keep <- lo != hi
+  lo <- lo[keep]
+  hi <- hi[keep]
+  key <- paste(lo, hi, sep = "\r")
+  uniq <- !duplicated(key)
+  lo <- lo[uniq]
+  hi <- hi[uniq]
+  d <- sqrt((xy[lo, 1] - xy[hi, 1])^2 + (xy[lo, 2] - xy[hi, 2])^2)
+  ed <- data.table::data.table(
+    from = as.character(df$Cell_ID[lo]),
+    to = as.character(df$Cell_ID[hi]),
+    dist = as.numeric(d)
+  )
+  if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
+    ed <- ed[dist <= max_edge_length]
+  }
+  message(sprintf("  Qhull Delaunay edges: %d", nrow(ed)))
+  ed
+}
+
+#' Single-block deldir triangulation -> undirected edges
+#' @keywords internal
+.edges_delaunay_deldir_block <- function(df, max_edge_length = NULL) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
+  )
+  if (nrow(df) < 2L) return(empty)
+  dd <- deldir::deldir(df$X, df$Y, suppressMsge = TRUE)
+  # delsgs$ind1/ind2 are 1-based point indices (faster than triang.list)
+  i1 <- as.integer(dd$delsgs$ind1)
+  i2 <- as.integer(dd$delsgs$ind2)
+  if (!length(i1)) return(empty)
+  lo <- pmin(i1, i2)
+  hi <- pmax(i1, i2)
+  keep <- lo != hi
+  lo <- lo[keep]
+  hi <- hi[keep]
+  if (!length(lo)) return(empty)
+  # unique undirected
+  key <- paste(lo, hi, sep = "\r")
+  uniq <- !duplicated(key)
+  lo <- lo[uniq]
+  hi <- hi[uniq]
+  d <- sqrt((df$X[lo] - df$X[hi])^2 + (df$Y[lo] - df$Y[hi])^2)
+  ed <- data.table::data.table(
+    from = as.character(df$Cell_ID[lo]),
+    to = as.character(df$Cell_ID[hi]),
+    dist = as.numeric(d)
+  )
+  if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
     ed <- ed[dist <= max_edge_length]
   }
   ed
 }
 
-#' Build edges using window method
+#' Overlapping spatial-chunk Delaunay for large FOVs
+#'
+#' Each grid core is triangulated with a spatial buffer. An edge is kept if its
+#' midpoint falls in that core (half-open), so every edge has a unique owner
+#' tile while the buffer supplies the neighbours needed for a correct local DT.
+#' @keywords internal
+.edges_delaunay_chunked <- function(df, max_edge_length = NULL,
+                                    chunk_max_points = 250000L) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
+  )
+  DT <- data.table::as.data.table(df)[, .(Cell_ID = as.character(Cell_ID), X, Y)]
+  n <- nrow(DT)
+  if (n < 2L) return(empty)
+
+  nn1 <- tryCatch(
+    .nn_dist_at_rank(as.matrix(DT[, .(X, Y)]), k_nn = 1L),
+    error = function(e) NA_real_
+  )
+  med_nn <- if (length(nn1) && all(is.finite(nn1))) stats::median(nn1) else NA_real_
+  xr <- range(DT$X, na.rm = TRUE)
+  yr <- range(DT$Y, na.rm = TRUE)
+  dx <- max(xr[2] - xr[1], .Machine$double.eps)
+  dy <- max(yr[2] - yr[1], .Machine$double.eps)
+  diag_len <- sqrt(dx^2 + dy^2)
+  buf_candidates <- c(
+    if (is.finite(med_nn) && med_nn > 0) 100 * med_nn else NA_real_,
+    if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
+      as.numeric(max_edge_length)
+    } else {
+      NA_real_
+    },
+    0.05 * diag_len
+  )
+  buffer <- max(buf_candidates[is.finite(buf_candidates)], na.rm = TRUE)
+  if (!is.finite(buffer) || buffer <= 0) buffer <- 0.05 * max(diag_len, 1)
+
+  n_tile <- max(2L, as.integer(ceiling(sqrt(n / as.numeric(chunk_max_points)))))
+  x_breaks <- seq(xr[1], xr[2], length.out = n_tile + 1L)
+  y_breaks <- seq(yr[1], yr[2], length.out = n_tile + 1L)
+  if (length(unique(x_breaks)) < 2L) x_breaks <- c(xr[1] - 1, xr[2] + 1)
+  if (length(unique(y_breaks)) < 2L) y_breaks <- c(yr[1] - 1, yr[2] + 1)
+
+  message(sprintf(
+    "  Delaunay chunks: %dx%d tiles | buffer=%.3f | chunk_max=%d",
+    length(x_breaks) - 1L, length(y_breaks) - 1L, buffer, chunk_max_points
+  ))
+
+  edge_parts <- list()
+  part_i <- 0L
+  nx <- length(x_breaks) - 1L
+  ny <- length(y_breaks) - 1L
+  for (ix in seq_len(nx)) {
+    for (iy in seq_len(ny)) {
+      x0 <- x_breaks[ix]
+      x1 <- x_breaks[ix + 1L]
+      y0 <- y_breaks[iy]
+      y1 <- y_breaks[iy + 1L]
+      x_right <- ix == nx
+      y_top <- iy == ny
+
+      block <- DT[
+        X >= (x0 - buffer) & X <= (x1 + buffer) &
+          Y >= (y0 - buffer) & Y <= (y1 + buffer)
+      ]
+      if (nrow(block) < 2L) next
+
+      # Ownership region for edge midpoints (half-open except final row/col)
+      in_core_mid <- function(mx, my) {
+        okx <- if (x_right) mx >= x0 & mx <= x1 else mx >= x0 & mx < x1
+        oky <- if (y_top) my >= y0 & my <= y1 else my >= y0 & my < y1
+        okx & oky
+      }
+
+      block_ed <- .edges_delaunay_block_maybe_split(
+        block,
+        in_core_mid = in_core_mid,
+        max_edge_length = max_edge_length,
+        chunk_max_points = chunk_max_points,
+        depth = 0L
+      )
+      if (nrow(block_ed)) {
+        part_i <- part_i + 1L
+        edge_parts[[part_i]] <- block_ed
+      }
+    }
+  }
+
+  if (!length(edge_parts)) return(empty)
+  ed <- data.table::rbindlist(edge_parts, use.names = TRUE, fill = TRUE)
+  ed[, `:=`(a = pmin(from, to), b = pmax(from, to))]
+  data.table::setorder(ed, a, b, dist)
+  ed <- ed[, .SD[1L], by = .(a, b)]
+  ed[, `:=`(from = a, to = b, a = NULL, b = NULL)]
+  if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
+    ed <- ed[dist <= max_edge_length]
+  }
+  message(sprintf("  Delaunay chunked merge: %d unique edges", nrow(ed)))
+  ed[]
+}
+
+#' Triangulate one expanded block; keep edges whose midpoint is in core
+#' @keywords internal
+.edges_delaunay_block_maybe_split <- function(block, in_core_mid,
+                                              max_edge_length = NULL,
+                                              chunk_max_points = 250000L,
+                                              depth = 0L) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
+  )
+  if (nrow(block) < 2L || !is.function(in_core_mid)) return(empty)
+
+  run_one <- function(blk) {
+    ed <- .edges_delaunay_deldir_block(blk, max_edge_length = max_edge_length)
+    if (!nrow(ed)) return(empty)
+    # map endpoints to coordinates in blk
+    i_from <- match(ed$from, as.character(blk$Cell_ID))
+    i_to <- match(ed$to, as.character(blk$Cell_ID))
+    ok <- is.finite(i_from) & is.finite(i_to)
+    ed <- ed[ok]
+    i_from <- i_from[ok]
+    i_to <- i_to[ok]
+    mx <- (blk$X[i_from] + blk$X[i_to]) / 2
+    my <- (blk$Y[i_from] + blk$Y[i_to]) / 2
+    ed[in_core_mid(mx, my)]
+  }
+
+  split_quad <- function() {
+    if (depth >= 12L) {
+      stop("Delaunay chunk split exceeded max depth at n=", nrow(block))
+    }
+    xm <- stats::median(block$X)
+    ym <- stats::median(block$Y)
+    # Sub-cores inherit parent ownership predicate (midpoint still tested
+    # against the original tile core via in_core_mid).
+    quads <- list(
+      block[X <= xm & Y <= ym],
+      block[X <= xm & Y > ym],
+      block[X > xm & Y <= ym],
+      block[X > xm & Y > ym]
+    )
+    parts <- lapply(quads, function(q) {
+      if (nrow(q) < 2L) return(empty)
+      .edges_delaunay_block_maybe_split(
+        q, in_core_mid, max_edge_length, chunk_max_points, depth + 1L
+      )
+    })
+    data.table::rbindlist(parts, use.names = TRUE, fill = TRUE)
+  }
+
+  if (nrow(block) > chunk_max_points) {
+    return(split_quad())
+  }
+
+  tryCatch(
+    run_one(block),
+    error = function(e) {
+      if (!grepl("long vectors|Fortran", conditionMessage(e), ignore.case = TRUE)) {
+        stop(e)
+      }
+      message(
+        "  deldir Fortran limit at n=", nrow(block),
+        " depth=", depth, " - splitting"
+      )
+      split_quad()
+    }
+  )
+}
+
+#' Build edges with a Stereopy-style sliding window + local kNN
+#'
+#' Windows of side `tile` (`window_size`) slide over the field with stride
+#' `sliding_step` (default half the window). Inside each window a kNN graph
+#' is built; overlapping windows are merged (undirected, shortest edge kept).
+#'
 #' @param df data.table with spatial data
-#' @param k number of neighbors
-#' @param tile window size
+#' @param k number of neighbors inside each window
+#' @param tile window side length (Stereopy `d`)
+#' @param sliding_step window stride (Stereopy `s`; default `tile / 2`)
+#' @param max_edge_length optional maximum edge length filter
 #' @return data.table with edges
 #' @keywords internal
-.edges_window <- function(df, k, tile) {
+.edges_window <- function(df, k, tile, sliding_step = NULL,
+                          max_edge_length = NULL) {
+  empty <- data.table::data.table(
+    from = character(), to = character(), dist = numeric()
+  )
   DT <- df[, .(Cell_ID, X, Y)]
-  # Tile assignment
-  DT[, gx := floor(X / tile)]
-  DT[, gy := floor(Y / tile)]
-  # Neighborhood map (self + 8 neighbors)
-  neigh <- data.table::CJ(dx = -1:1, dy = -1:1)
+  n <- nrow(DT)
+  if (n < 2L) return(empty)
 
-  res <- vector("list", 0L)
-  # Iterate unique tiles; keep memory local
-  tiles <- unique(DT[, .(gx, gy)])
-  for (i in seq_len(nrow(tiles))) {
-    tx <- tiles$gx[i]; ty <- tiles$gy[i]
-    # Gather cells in tile neighborhood
-    nb <- data.table::CJ(gx = tx + neigh$dx,
-                         gy = ty + neigh$dy,
-                         unique = TRUE)
-    sub <- DT[nb, on = .(gx, gy), nomatch = 0L]
-    if (nrow(sub) < 2) next
-    # Run small-k kNN within local block
-    coords <- as.matrix(sub[, .(X, Y)])
-    kk <- min(k + 1, max(2, nrow(sub)))
-    nn <- RANN::nn2(coords, coords, k = kk)
-    from_idx <- rep.int(seq_len(nrow(sub)), kk - 1)
-    to_idx   <- as.vector(t(nn$nn.idx[, -1, drop = FALSE]))
-    d        <- as.vector(t(nn$nn.dists[, -1, drop = FALSE]))
-    ed <- data.table::data.table(
-      from = sub$Cell_ID[from_idx],
-      to   = sub$Cell_ID[to_idx],
-      dist = d
-    )
-    res[[length(res) + 1L]] <- ed
+  k <- as.integer(k)
+  if (!is.finite(k) || k < 1L) {
+    stop("n_neighbors must be a positive integer for window.")
   }
-  ed <- data.table::rbindlist(res, use.names = TRUE, fill = TRUE)
-  if (nrow(ed) == 0L) return(ed)
-  ed[, key := ifelse(from < to, paste(from,to), paste(to,from))]
+  d <- as.numeric(tile)[1L]
+  if (!is.finite(d) || d <= 0) {
+    stop("window_size must be a positive number.")
+  }
+  s <- if (is.null(sliding_step) || !is.finite(sliding_step) || sliding_step <= 0) {
+    d / 2
+  } else {
+    as.numeric(sliding_step)[1L]
+  }
+  if (s > d) {
+    warning(
+      "window_slide_step > window_size; clamping step to window_size ",
+      "so sliding windows still cover the field."
+    )
+    s <- d
+  }
+
+  xmin <- min(DT$X, na.rm = TRUE)
+  xmax <- max(DT$X, na.rm = TRUE)
+  ymin <- min(DT$Y, na.rm = TRUE)
+  ymax <- max(DT$Y, na.rm = TRUE)
+
+  window_starts <- function(lo, hi, d, s) {
+    span <- hi - lo
+    if (!is.finite(span) || span <= 0 || span <= d) return(lo)
+    starts <- seq(lo, hi - d, by = s)
+    last <- hi - d
+    if (abs(starts[length(starts)] - last) > 1e-8 * max(1, d)) {
+      starts <- c(starts, last)
+    }
+    unique(starts)
+  }
+  x_starts <- window_starts(xmin, xmax, d, s)
+  y_starts <- window_starts(ymin, ymax, d, s)
+
+  res <- vector("list", length(x_starts) * length(y_starts))
+  idx <- 0L
+  for (wx in x_starts) {
+    xhi <- wx + d
+    for (wy in y_starts) {
+      yhi <- wy + d
+      sub <- DT[X >= wx & X <= xhi & Y >= wy & Y <= yhi]
+      if (nrow(sub) < 2L) next
+      coords <- as.matrix(sub[, .(X, Y)])
+      kk <- min(k + 1L, nrow(sub))
+      if (kk < 2L) next
+      nn <- RANN::nn2(coords, coords, k = kk)
+      from_idx <- rep.int(seq_len(nrow(sub)), kk - 1L)
+      to_idx <- as.vector(t(nn$nn.idx[, -1L, drop = FALSE]))
+      distv <- as.vector(t(nn$nn.dists[, -1L, drop = FALSE]))
+      ed <- data.table::data.table(
+        from = sub$Cell_ID[from_idx],
+        to = sub$Cell_ID[to_idx],
+        dist = distv
+      )
+      if (!is.null(max_edge_length) && is.finite(max_edge_length)) {
+        ed <- ed[dist <= max_edge_length]
+      }
+      if (nrow(ed) > 0L) {
+        idx <- idx + 1L
+        res[[idx]] <- ed
+      }
+    }
+  }
+  if (idx < 1L) return(empty)
+  ed <- data.table::rbindlist(res[seq_len(idx)], use.names = TRUE, fill = TRUE)
+  ed[, key := ifelse(from < to, paste(from, to), paste(to, from))]
   ed <- ed[order(key, dist)][!duplicated(key)][, key := NULL][]
   ed
 }
@@ -875,7 +1791,7 @@ build_spatial_network <- function(
 #' @return Enhanced data.table with neighborhood type proportions
 #' @examples
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' feat <- calculate_neighborhood_features(df, edges)
 #' names(feat)
 #' @export
@@ -977,7 +1893,8 @@ calculate_neighborhood_features <- function(df, edges,
 #' @param feature_df Data.table with neighborhood features
 #' @param spatial_edges Spatial edges from build_spatial_network()
 #' @param method Clustering method ("kmeans", "hdbscan", or "louvain")
-#' @param k Number of clusters (for kmeans)
+#' @param k Number of clusters (for kmeans). This is **not** spatial neighbor count;
+#'   use `n_neighbors` in `build_spatial_network()`.
 #' @param use_pca Whether to use PCA for dimensionality reduction
 #' @param var_threshold Variance threshold for PCA components
 #' @param n_components Explicit number of PCA components (overrides var_threshold)
@@ -987,7 +1904,7 @@ calculate_neighborhood_features <- function(df, edges,
 #' @examples
 #' \donttest{
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' feat <- calculate_neighborhood_features(df, edges)
 #' cl <- cluster_neighborhoods(feat, edges, method = "kmeans", k = 3)
 #' "Neighborhood_Cluster" %in% names(cl)
@@ -1133,21 +2050,54 @@ cluster_neighborhoods <- function(feature_df,
   return(feature_df)
 }
 
+#' Purity from an undirected edge list (row index in `ids`)
+#' @keywords internal
+.purity_from_edges <- function(ids, celltype, edges, min_cells) {
+  n <- length(ids)
+  purity <- rep(NA_real_, n)
+  if (is.null(edges) || !nrow(edges)) return(purity)
+  id_to_i <- setNames(seq_len(n), as.character(ids))
+  types <- as.character(celltype)
+  ed <- data.table::data.table(
+    a = c(as.character(edges$from), as.character(edges$to)),
+    b = c(as.character(edges$to), as.character(edges$from))
+  )
+  nbr <- ed[, .(nbrs = list(unique(b))), by = a]
+  for (i in seq_len(nrow(nbr))) {
+    ii <- id_to_i[[nbr$a[i]]]
+    if (is.null(ii) || is.na(ii)) next
+    nbs_i <- unname(id_to_i[nbr$nbrs[[i]]])
+    nbs_i <- nbs_i[!is.na(nbs_i) & nbs_i != ii]
+    if (length(nbs_i) < min_cells) next
+    tab <- table(types[nbs_i])
+    purity[ii] <- max(tab) / sum(tab)
+  }
+  purity
+}
+
 #' Calculate neighborhood purity using flexible neighbor definitions
+#'
+#' Neighbor definitions match `build_spatial_network()`: knn, radius ball,
+#' Delaunay triangulation, or Stereopy-style sliding window + local kNN.
 #'
 #' @param df A data.frame or data.table containing spatial coordinates and cell type labels.
 #' @param x_col Character, name of the X-coordinate column.
 #' @param y_col Character, name of the Y-coordinate column.
 #' @param celltype_col Character, name of the cell type column.
 #' @param method Character, neighbor definition: "window", "radius", "knn", or "delaunay".
-#' @param k Integer, number of nearest neighbors for method = "knn" (ignored otherwise).
-#' @param radius Numeric, distance threshold for methods "radius" and "window" (ignored otherwise).
+#' @param n_neighbors Integer, neighbor count for `knn` and `window`.
+#' @param k Integer, **deprecated** neighbor count. Use `n_neighbors`.
+#' @param radius Numeric search radius for `method = "radius"`. `NULL` uses
+#'   the same 1-NN x 3 default as `build_spatial_network()`.
+#' @param window_size Sliding-window side length for `method = "window"`.
+#'   `NULL` uses the same data default as `build_spatial_network()`.
+#' @param window_slide_step Window stride; `NULL` uses `window_size / 2`.
 #' @param min_cells Integer, minimum number of neighbors required to compute purity.
 #' @param verbose Logical, print progress messages.
 #' @return A data.table with an added column `Neighborhood_Purity`.
 #' @examples
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' out <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+#' out <- calculate_neighborhood_purity(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' summary(out$Neighborhood_Purity)
 #' @export
 calculate_neighborhood_purity <- function(df,
@@ -1155,10 +2105,23 @@ calculate_neighborhood_purity <- function(df,
                                           y_col = "Y",
                                           celltype_col = "celltype",
                                           method = c("window", "radius", "knn", "delaunay"),
-                                          k = 30,
-                                          radius = 30,
+                                          n_neighbors = 10L,
+                                          k = NULL,
+                                          radius = NULL,
+                                          window_size = NULL,
+                                          window_slide_step = NULL,
                                           min_cells = 5,
                                           verbose = TRUE) {
+  if (!is.null(k)) {
+    warning(
+      "`k` in calculate_neighborhood_purity() is deprecated for neighbor count. ",
+      "Use n_neighbors.",
+      call. = FALSE
+    )
+    if (missing(n_neighbors)) n_neighbors <- as.integer(k)
+  }
+  k <- as.integer(n_neighbors)
+  if (!is.finite(k) || k < 1L) k <- 20L
 
   ## ---- 0. Ensure data.table with zero-copy --------------------------
   if (!data.table::is.data.table(df)) {
@@ -1179,27 +2142,41 @@ calculate_neighborhood_purity <- function(df,
   }
 
   ## ---- 2. Extract vectors for speed ---------------------------------
-  x <- df[[x_col]]
-  y <- df[[y_col]]
+  x <- as.numeric(df[[x_col]])
+  y <- as.numeric(df[[y_col]])
   celltype <- df[[celltype_col]]
   purity <- rep(NA_real_, length(x))
+  ids <- if ("Cell_ID" %in% names(df)) as.character(df$Cell_ID) else as.character(seq_along(x))
+  work <- data.table::data.table(Cell_ID = ids, X = x, Y = y)
 
   ## ---- 3. Branch by method ------------------------------------------
   if (method == "window") {
-    half <- radius / 2
-    for (i in seq_along(x)) {
-      if (verbose && i %% 1000 == 0) message("Processed ", i, "/", length(x))
-      mask <- (x >= x[i] - half) & (x <= x[i] + half) &
-        (y >= y[i] - half) & (y <= y[i] + half)
-      nbs <- which(mask)
-      nbs <- setdiff(nbs, i)              # Exclude self
-      if (length(nbs) < min_cells) next
-      tab <- table(celltype[nbs])
-      purity[i] <- max(tab) / sum(tab)
+    if (is.null(window_size) || !is.finite(window_size) || window_size <= 0) {
+      opt_win <- .calc_adaptive_window_size(x, y)
+      window_size <- opt_win$window_size
+      if (is.null(window_slide_step)) window_slide_step <- opt_win$sliding_step
+    } else if (is.null(window_slide_step)) {
+      window_slide_step <- as.numeric(window_size) / 2
     }
+    if (verbose) {
+      message(
+        "window_size=", round(window_size, 3),
+        " | window_slide_step=", round(window_slide_step, 3),
+        " | n_neighbors=", k
+      )
+    }
+    win_edges <- .edges_window(
+      work, k = k, tile = window_size, sliding_step = window_slide_step
+    )
+    purity <- .purity_from_edges(ids, celltype, win_edges, min_cells)
   }
 
   if (method == "radius") {
+    if (is.null(radius) || !is.finite(radius) || radius <= 0) {
+      d1 <- RANN::nn2(cbind(x, y), k = 2)$nn.dists[, 2]
+      radius <- .default_search_radius(stats::median(d1, na.rm = TRUE), multiplier = 3)
+    }
+    if (verbose) message("radius=", round(radius, 3))
     for (i in seq_along(x)) {
       if (verbose && i %% 1000 == 0) message("Processed ", i, "/", length(x))
       dx <- x - x[i]
@@ -1260,18 +2237,35 @@ calculate_neighborhood_purity <- function(df,
 
 #' Analyze spatial interactions between cell types
 #'
+#' Counts cell-type contact edges and optionally normalizes by type abundance
+#' so frequent types do not dominate the interaction matrix.
+#'
+#' Normalization:
+#' \itemize{
+#'   \item `abundance_normalized`: \eqn{c_{ij} / (n_i n_j)}
+#'   \item `enrichment_matrix`: observed / expected under random labeling of
+#'     the same graph, where
+#'     \eqn{E_{ij} = E \cdot 2 p_i p_j} (i != j) and
+#'     \eqn{E_{ii} = E \cdot p_i^2}, with \eqn{p_i = n_i / N}.
+#' }
+#'
 #' @param df Spatial data with cell types
 #' @param edges Spatial network edges (data.frame with "from" and "to")
 #' @param celltype_col Column name for cell types in metadata.
-#' @return List with interaction matrix and network graph
+#' @param normalize_abundance logical; if TRUE (default), also compute
+#'   abundance-normalized and enrichment matrices.
+#' @return List with `interaction_matrix` (raw counts), `network`, and when
+#'   `normalize_abundance = TRUE` also `abundance_normalized`,
+#'   `enrichment_matrix`, and `type_abundance`.
 #' @examples
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' intx <- analyze_spatial_interactions(df, edges)
 #' dim(intx$interaction_matrix)
 #' @export
 analyze_spatial_interactions <- function(df, edges,
-                                         celltype_col = "celltype") {
+                                         celltype_col = "celltype",
+                                         normalize_abundance = TRUE) {
   # Basic checks
   if (!celltype_col %in% names(df)) stop("'", celltype_col, "' column not found in df")
   if (!"Cell_ID" %in% names(df)) stop("'Cell_ID' column not found in df")
@@ -1295,12 +2289,12 @@ analyze_spatial_interactions <- function(df, edges,
   # Remove NA or unknown types
   valid_edges <- edges[!is.na(edges$type1) & !is.na(edges$type2), ]
 
-  # Build interaction frequency table
+  # Build interaction frequency table (each undirected edge counted once)
   inter_table <- table(pmin(valid_edges$type1, valid_edges$type2),
                        pmax(valid_edges$type1, valid_edges$type2))
 
-  # Convert to symmetric matrix
-  all_types <- sort(unique(df[[celltype_col]]))
+  # Convert to symmetric matrix of raw contact counts
+  all_types <- sort(unique(as.character(df[[celltype_col]])))
   int_mat <- matrix(0, nrow = length(all_types), ncol = length(all_types),
                     dimnames = list(all_types, all_types))
   for (i in seq_len(nrow(inter_table))) {
@@ -1313,37 +2307,187 @@ analyze_spatial_interactions <- function(df, edges,
     }
   }
 
-  # Build graph
+  # Build graph from raw counts
   g <- igraph::graph_from_adjacency_matrix(int_mat, mode = "undirected", weighted = TRUE)
 
-  return(list(interaction_matrix = int_mat, network = g))
+  out <- list(interaction_matrix = int_mat, network = g)
+
+  if (isTRUE(normalize_abundance)) {
+    type_n <- as.numeric(table(factor(df[[celltype_col]], levels = all_types)))
+    names(type_n) <- all_types
+    N <- sum(type_n)
+    p <- type_n / N
+    n_edges <- nrow(valid_edges)
+
+    # count / (n_i * n_j): down-weights abundant pairs
+    abund_norm <- int_mat
+    for (a in all_types) {
+      for (b in all_types) {
+        denom <- type_n[a] * type_n[b]
+        abund_norm[a, b] <- if (denom > 0) int_mat[a, b] / denom else NA_real_
+      }
+    }
+
+    # Observed/expected under random type labels on the same edge set
+    expected <- outer(p, p) * n_edges
+    # off-diagonal: two orderings of an undirected edge
+    expected <- expected * 2
+    diag(expected) <- (p^2) * n_edges
+    enrichment <- int_mat / expected
+    enrichment[!is.finite(enrichment)] <- NA_real_
+
+    out$abundance_normalized <- abund_norm
+    out$enrichment_matrix <- enrichment
+    out$type_abundance <- type_n
+  }
+
+  out
 }
 
 
 #' Generate color palette for visualizations
+#'
+#' Soft candy colors that stay distinct (no neon / fluorescent hues).
+#' Continuous heatmaps keep the pink sequential ramp unchanged.
 #'
 #' @param n Number of colors needed
 #' @return Vector of color codes
 #' @examples
 #' get_color_palette(5)
 #' @export
-#'
-#' @description
-#' Creates optimized color palettes:
-#' 1. Small sets: ColorBrewer Set1
-#' 2. Medium sets: Set3
-#' 3. Large sets: Hue palette
-#' Ensures distinct colors for all categories
 get_color_palette <- function(n) {
-  if (n <= 2) {
-    return(c("#1f77b4", "#ff7f0e")[1:n])  # Minimal palette
-  } else if (n <= 9) {
-    return(RColorBrewer::brewer.pal(n, "Set1"))  # ColorBrewer qualitative
-  } else if (n <= 12) {
-    return(RColorBrewer::brewer.pal(n, "Set3"))  # Extended qualitative
+  # One color per hue family; spread around the wheel for richness + transparency robustness
+  candy_base <- c(
+    "#E05C6E",  # rose-red
+    "#4EA8DE",  # sky blue
+    "#E8C04A",  # gold
+    "#4CB87A",  # green
+    "#8B6BC9",  # purple
+    "#E8884A",  # orange
+    "#3DB8A0",  # teal
+    "#C45BA0",  # magenta
+    "#A67C52",  # brown
+    "#5B7FD6",  # indigo
+    "#A8C75A",  # yellow-green
+    "#6B7C85",  # slate
+    "#D4A017",  # amber
+    "#2E8B57",  # forest
+    "#E76F51",  # terracotta
+    "#45A8D0",  # cyan
+    "#9B59B6",  # orchid
+    "#1ABC9C",  # mint
+    "#3498DB",  # clear blue
+    "#F39C12"   # sunflower
+  )
+  if (n <= 0) {
+    return(character(0))
+  } else if (n <= length(candy_base)) {
+    return(candy_base[seq_len(n)])
   } else {
-    return(scales::hue_pal()(n))  # Large palette
+    extra_n <- n - length(candy_base)
+    # Additional hues offset so they do not land on the same families as candy_base
+    extra <- scales::hue_pal(h = c(8, 368), c = 70, l = 52)(length(candy_base) + extra_n)
+    extra <- setdiff(toupper(extra), toupper(candy_base))
+    if (length(extra) < extra_n) {
+      extra <- c(extra, scales::hue_pal(h = c(20, 380), c = 55, l = 45)(extra_n))
+    }
+    return(c(candy_base, extra[seq_len(extra_n)]))
   }
+}
+
+#' Stable cell-type -> color mapping (same label => same color across plots)
+#'
+#' By default colors are assigned from a fixed soft pastel pool via a
+#' deterministic string hash, so a cell type keeps its color even when other
+#' types are absent. If `all_levels` is supplied, colors are assigned by
+#' alphabetical order over that full set (preferred when the complete type
+#' list is known).
+#'
+#' @param levels Character vector of cell-type / category labels to color
+#' @param all_levels Optional full set of labels for ordered assignment
+#' @return Named character vector of hex colors
+#' @examples
+#' assign_celltype_colors(c("B", "T", "Macrophage"))
+#' @export
+assign_celltype_colors <- function(levels, all_levels = NULL) {
+  labs <- unique(as.character(levels))
+  labs <- labs[!is.na(labs) & nzchar(labs)]
+  if (!length(labs)) {
+    return(setNames(character(0), character(0)))
+  }
+
+  # Alphabetical assignment over the reference set -> unique colors, stable
+  # whenever the same full type list is used (pass all_levels when zooming).
+  ref <- if (is.null(all_levels)) {
+    sort(labs)
+  } else {
+    ref0 <- sort(unique(as.character(all_levels)))
+    ref0[!is.na(ref0) & nzchar(ref0)]
+  }
+  if (!length(ref)) {
+    return(setNames(character(0), character(0)))
+  }
+  cols <- get_color_palette(length(ref))
+  names(cols) <- ref
+  cols
+}
+
+#' Candy sequential palette for continuous heatmaps
+#' @param n Number of colors
+#' @keywords internal
+.sphinx_soft_sequential <- function(n = 256) {
+  grDevices::colorRampPalette(c(
+    "#FFF5F8", "#FFE0EC", "#FFB3D1", "#FF8FAB",
+    "#F06595", "#E63980", "#C9184A"
+  ))(n)
+}
+
+#' Candy diverging palette (sky blue - white - candy pink)
+#' @keywords internal
+.sphinx_soft_diverging <- function(n = 256) {
+  grDevices::colorRampPalette(c(
+    "#4CC9F0", "#90E0EF", "#CAF0F8", "#FFF5F8",
+    "#FFB3D1", "#FF8FAB", "#E63980"
+  ))(n)
+}
+
+#' Publication theme for Sphinx ggplot visuals
+#' @param base_size Base font size (default 14 for SCI figures)
+#' @param grid Show panel grid (default FALSE)
+#' @keywords internal
+.sphinx_sci_theme <- function(base_size = 14, grid = FALSE) {
+  base_size <- max(8, as.numeric(base_size))
+  th <- ggplot2::theme_classic(base_size = base_size) +
+    ggplot2::theme(
+      text = ggplot2::element_text(colour = "black", size = base_size),
+      plot.title = ggplot2::element_text(
+        face = "plain", size = max(8, base_size + 4), hjust = 0.5,
+        margin = ggplot2::margin(b = 10)
+      ),
+      plot.subtitle = ggplot2::element_text(
+        face = "plain", size = max(8, base_size), hjust = 0.5
+      ),
+      axis.title = ggplot2::element_text(face = "plain", size = max(8, base_size + 1)),
+      axis.text = ggplot2::element_text(
+        face = "plain", size = max(8, base_size - 1), colour = "black"
+      ),
+      legend.title = ggplot2::element_text(face = "plain", size = max(8, base_size)),
+      legend.text = ggplot2::element_text(face = "plain", size = max(8, base_size - 2)),
+      strip.text = ggplot2::element_text(face = "plain", size = max(8, base_size)),
+      panel.border = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8),
+      axis.line = ggplot2::element_blank(),
+      plot.background = ggplot2::element_rect(fill = "white", colour = NA),
+      panel.background = ggplot2::element_rect(fill = "white", colour = NA)
+    )
+  if (isTRUE(grid)) {
+    th <- th + ggplot2::theme(
+      panel.grid.major = ggplot2::element_line(colour = "grey92", linewidth = 0.3),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+  } else {
+    th <- th + ggplot2::theme(panel.grid = ggplot2::element_blank())
+  }
+  th
 }
 
 #' Visualize spatial cell type distribution
@@ -1358,6 +2502,9 @@ get_color_palette <- function(n) {
 #' @param legend_point_size Legend point size (default: 3)
 #' @param title Plot title
 #' @param legend.position Legend position (default: "right")
+#' @param base_size Base font size in points (default: 14; minimum 8)
+#' @param color_palette Optional named color vector; if NULL uses assign_celltype_colors()
+#' @param all_levels Optional full label set for stable colors when subsetting / zooming
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
@@ -1374,11 +2521,14 @@ visualize_spatial_distribution <- function(df,
                                            y_col = "Y",
                                            celltype_col = "celltype",
                                            point_size = 1.5,
-                                           point_alpha = 0.6,
+                                           point_alpha = 0.85,
                                            point_shape = 16,
                                            legend_point_size = 3,
                                            title = NULL,
                                            legend.position = "right",
+                                           base_size = 14,
+                                           color_palette = NULL,
+                                           all_levels = NULL,
                                            save_path = NULL,
                                            width = 10,
                                            height = 8) {
@@ -1390,11 +2540,14 @@ visualize_spatial_distribution <- function(df,
   df$plot_Y <- df[[y_col]]
   df$plot_celltype <- df[[celltype_col]]
 
-  # Generate color palette
-  n_types <- length(unique(df$plot_celltype))
-  palette <- get_color_palette(n_types)
+  # Stable cell-type colors across plots
+  if (is.null(color_palette)) {
+    palette <- assign_celltype_colors(df$plot_celltype, all_levels = all_levels)
+  } else {
+    palette <- color_palette
+  }
 
-  # Create spatial plot
+  # Create spatial plot (no internal grid)
   p <- ggplot2::ggplot(df, ggplot2::aes(x = plot_X, y = plot_Y, color = plot_celltype)) +
     ggplot2::geom_point(size = point_size, alpha = point_alpha, shape = point_shape) +
     ggplot2::scale_color_manual(
@@ -1407,14 +2560,14 @@ visualize_spatial_distribution <- function(df,
         )
       )
     ) +
-    ggplot2::theme_minimal() +
     ggplot2::labs(
       title = if (!is.null(title)) title else "Spatial Distribution of Cell Types",
       x = "X Coordinate",
       y = "Y Coordinate",
-      color = celltype_col
+      color = "Cell Type"
     ) +
     ggplot2::coord_fixed() +
+    .sphinx_sci_theme(base_size = base_size, grid = FALSE) +
     ggplot2::theme(legend.position = legend.position)
 
   # Save plot if path provided
@@ -1432,6 +2585,8 @@ visualize_spatial_distribution <- function(df,
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
+#' @param base_size Base font size in points (default: 14; minimum 8)
+#' @param show_values Whether to print distance values in cells (default: TRUE)
 #' @return ggplot object and saves plot to file if save_path provided
 #' @examples
 #' \donttest{
@@ -1444,62 +2599,80 @@ visualize_spatial_distribution <- function(df,
 visualize_distance_heatmap <- function(dist_result,
                                        save_path = NULL,
                                        width = 12,
-                                       height = 10) {
+                                       height = 10,
+                                       base_size = 14,
+                                       show_values = TRUE) {
 
   # Prepare data
   dist_matrix <- dist_result$distance_matrix
   dist_df <- reshape2::melt(dist_matrix, varnames = c("Source", "Target"), value.name = "Distance")
+  # Self-pair / missing distances: keep tiles blank, skip labels
+  dist_df$Distance_plot <- dist_df$Distance
+  dist_ok <- dist_df[!is.na(dist_df$Distance), , drop = FALSE]
 
-  # Calculate optimal text color
-  dist_df$TextColor <- ifelse(
-    dist_df$Distance < stats::quantile(dist_df$Distance, 0.5, na.rm = TRUE),
-    "black",
-    "white"
+  # Calculate optimal text color against candy sequential fill
+  mid_cut <- stats::quantile(dist_ok$Distance, 0.55, na.rm = TRUE)
+  dist_ok$TextColor <- ifelse(dist_ok$Distance < mid_cut, "#4A1942", "#FFF5F8")
+
+  soft_cols <- c(
+    "#FFF5F8", "#FFE0EC", "#FFB3D1", "#FF8FAB",
+    "#F06595", "#E63980", "#C9184A"
   )
+
+  # Text size scales with figure size; floor at 8 pt (ggplot size ~= mm)
+  n_lab <- max(nrow(dist_matrix), ncol(dist_matrix), 1L)
+  inch_per_cell <- min(as.numeric(width), as.numeric(height)) / n_lab
+  pt_to_gg <- 72.27 / 25.4  # ggplot2::.pt
+  text_size_min <- 8 / pt_to_gg
+  text_size <- max(text_size_min, min(5.5, inch_per_cell * 3.2))
 
   # Create heatmap
   p <- ggplot2::ggplot(dist_df, ggplot2::aes(x = Source, y = Target, fill = Distance)) +
-    ggplot2::geom_tile(color = "white", linewidth = 0.5) +
-    ggplot2::geom_text(
-      ggplot2::aes(label = round(Distance, 1), color = TextColor),
-      size = 3.5,
-      fontface = "bold",
-      show.legend = FALSE
-    ) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.4) +
     ggplot2::scale_fill_gradientn(
       name = "Mean Distance",
-      colours = c("#FFFFE0", "#FFD700", "#FF8C00", "#FF4500", "#8B0000", "#4B0082", "#2E0854"),
+      colours = soft_cols,
+      na.value = "grey95",
       values = scales::rescale(c(
-        min(dist_df$Distance, na.rm = TRUE),
-        stats::quantile(dist_df$Distance, 0.2, na.rm = TRUE),
-        stats::quantile(dist_df$Distance, 0.4, na.rm = TRUE),
-        stats::quantile(dist_df$Distance, 0.5, na.rm = TRUE),
-        stats::quantile(dist_df$Distance, 0.7, na.rm = TRUE),
-        stats::quantile(dist_df$Distance, 0.9, na.rm = TRUE),
-        max(dist_df$Distance, na.rm = TRUE)
+        min(dist_ok$Distance, na.rm = TRUE),
+        stats::quantile(dist_ok$Distance, 0.2, na.rm = TRUE),
+        stats::quantile(dist_ok$Distance, 0.4, na.rm = TRUE),
+        stats::quantile(dist_ok$Distance, 0.55, na.rm = TRUE),
+        stats::quantile(dist_ok$Distance, 0.7, na.rm = TRUE),
+        stats::quantile(dist_ok$Distance, 0.85, na.rm = TRUE),
+        max(dist_ok$Distance, na.rm = TRUE)
       ))
     ) +
-    ggplot2::scale_color_identity() +
     ggplot2::labs(
       title = "Mean Distance Between Cell Types",
       x = "Source Cell Type",
       y = "Target Cell Type"
     ) +
-    ggplot2::theme_minimal() +
+    .sphinx_sci_theme(base_size = base_size, grid = FALSE) +
     ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 10, face = "bold"),
-      axis.text.y = ggplot2::element_text(size = 10, face = "bold"),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      plot.title = ggplot2::element_text(size = 16, face = "bold", hjust = 0.5),
-      legend.position = "right",
-      legend.title = ggplot2::element_text(face = "bold"),
-      panel.grid = ggplot2::element_blank()
-    ) +
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+      legend.position = "right"
+    )
+
+  if (isTRUE(show_values)) {
+    p <- p +
+      ggplot2::geom_text(
+        data = dist_ok,
+        ggplot2::aes(label = round(Distance, 1), color = TextColor),
+        size = text_size,
+        fontface = "plain",
+        show.legend = FALSE
+      ) +
+      ggplot2::scale_color_identity()
+  }
+
+  p <- p +
     ggplot2::geom_tile(
-      data = dist_df[dist_df$Source == dist_df$Target, ],
-      ggplot2::aes(fill = Distance),
-      color = "black",
-      linewidth = 1
+      data = dist_df[as.character(dist_df$Source) == as.character(dist_df$Target), ],
+      ggplot2::aes(x = Source, y = Target),
+      color = "grey30",
+      linewidth = 0.8,
+      fill = NA
     )
 
   # Save plot if path provided
@@ -1517,6 +2690,7 @@ visualize_distance_heatmap <- function(dist_result,
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 14)
 #' @param height Plot height in inches (default: 8)
+#' @param base_size Base font size in points (default: 14; minimum 8)
 #' @return ggplot object and saves plot to file if save_path provided
 #' @examples
 #' \donttest{
@@ -1529,7 +2703,8 @@ visualize_distance_heatmap <- function(dist_result,
 visualize_distance_parallel <- function(dist_result,
                                         save_path = NULL,
                                         width = 14,
-                                        height = 8) {
+                                        height = 8,
+                                        base_size = 14) {
 
   # Prepare data
   dist_matrix <- dist_result$distance_matrix
@@ -1542,36 +2717,27 @@ visualize_distance_parallel <- function(dist_result,
                               variable.name = "Target",
                               value.name = "Distance")
 
-  # Create color scheme
-  n_types <- length(cell_types)
-  colors <- viridis::viridis(n_types, option = "D", direction = -1)
+  # Soft candy colors, stable by cell-type name
+  colors <- assign_celltype_colors(cell_types)
 
   # Create parallel coordinates plot
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = Target, y = Distance, group = Source, color = Source)) +
-    ggplot2::geom_line(size = 1.2, alpha = 0.9) +
-    ggplot2::geom_point(size = 3, alpha = 0.9) +
+    ggplot2::geom_line(linewidth = 1.1, alpha = 0.85) +
+    ggplot2::geom_point(size = 2.8, alpha = 0.9) +
     ggplot2::scale_color_manual(values = colors) +
     ggplot2::labs(
       title = "Cell Type Distance Relationships",
       x = "Target Cell Type",
-      y = "Distance to Target"
+      y = "Distance to Target",
+      color = "Source Cell Type"
     ) +
-    ggplot2::theme_minimal(base_size = 12) +
+    .sphinx_sci_theme(base_size = base_size, grid = TRUE) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(size = 16, face = "bold", hjust = 0.5,
-                                         margin = ggplot2::margin(b = 15)),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 10, face = "bold"),
-      axis.text.y = ggplot2::element_text(size = 9),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
       panel.grid.major.x = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      legend.position = "right",
-      legend.title = ggplot2::element_text(face = "bold", size = 10),
-      legend.text = ggplot2::element_text(size = 9),
-      plot.background = ggplot2::element_rect(fill = "white", color = NA)
+      legend.position = "right"
     ) +
-    ggplot2::guides(color = ggplot2::guide_legend(title = "Source Cell Type",
-                                                  title.position = "top"))
+    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, size = 3)))
 
   # Save plot if path provided
   if (!is.null(save_path)) {
@@ -1593,6 +2759,7 @@ visualize_distance_parallel <- function(dist_result,
 #' @param point_shape Point shape (default: 16)
 #' @param title Plot title
 #' @param legend.position Legend position (default: "right")
+#' @param base_size Base font size in points (default: 14; minimum 8)
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
@@ -1600,7 +2767,7 @@ visualize_distance_parallel <- function(dist_result,
 #' @examples
 #' \donttest{
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' df <- calculate_neighborhood_purity(df, method = "knn", k = 5, verbose = FALSE)
+#' df <- calculate_neighborhood_purity(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' p <- visualize_neighborhood_purity(df, save_path = tempfile(fileext = ".pdf"))
 #' class(p)
 #' }
@@ -1610,10 +2777,11 @@ visualize_neighborhood_purity <- function(df,
                                           y_col = "Y",
                                           max_points = 10000,
                                           point_size = 1.5,
-                                          point_alpha = 0.8,
+                                          point_alpha = 0.9,
                                           point_shape = 16,
                                           title = NULL,
                                           legend.position = "right",
+                                          base_size = 14,
                                           save_path = NULL,
                                           width = 10,
                                           height = 8) {
@@ -1633,17 +2801,20 @@ visualize_neighborhood_purity <- function(df,
   df$plot_X <- df[[x_col]]
   df$plot_Y <- df[[y_col]]
 
-  # Create purity visualization
+  # Candy sequential colors for purity
+  soft_cols <- c("#FFF5F8", "#FFD6E7", "#FFB3D1", "#FF8FAB", "#E63980", "#9B1D5A")
+
+  # Create purity visualization (no internal grid)
   p <- ggplot2::ggplot(df, ggplot2::aes(x = plot_X, y = plot_Y, color = Neighborhood_Purity)) +
     ggplot2::geom_point(size = point_size, alpha = point_alpha, shape = point_shape) +
-    ggplot2::scale_color_viridis_c(option = "magma", direction = -1) +
-    ggplot2::theme_minimal() +
+    ggplot2::scale_color_gradientn(colours = soft_cols, name = "Purity") +
     ggplot2::coord_fixed() +
     ggplot2::labs(
       title = if (!is.null(title)) title else "Neighborhood Purity",
       x = "X Coordinate",
       y = "Y Coordinate"
     ) +
+    .sphinx_sci_theme(base_size = base_size, grid = FALSE) +
     ggplot2::theme(legend.position = legend.position)
 
   # Save plot if path provided
@@ -1691,13 +2862,16 @@ calculate_cluster_composition <- function(df,
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
+#' @param cell_fontsize Font size for in-cell numbers (default: 11; minimum 8)
 #' @return ComplexHeatmap object and saves plot to file if save_path provided
 #' @examples
 #' \donttest{
-#' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
-#' comp <- calculate_cluster_composition(df)
-#' plot_composition_heatmap(comp, save_path = tempfile(fileext = ".pdf"))
+#' if (requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+#'   df <- prepare_data(Sphinx:::.sphinx_example_df(40))
+#'   df$Neighborhood_Cluster <- sample(1:3, nrow(df), replace = TRUE)
+#'   comp <- calculate_cluster_composition(df)
+#'   plot_composition_heatmap(comp, save_path = tempfile(fileext = ".pdf"))
+#' }
 #' }
 #' @export
 plot_composition_heatmap <- function(composition_df,
@@ -1706,7 +2880,13 @@ plot_composition_heatmap <- function(composition_df,
                                      value_col = "proportion",
                                      save_path = NULL,
                                      width = 12,
-                                     height = 10) {
+                                     height = 10,
+                                     cell_fontsize = 11) {
+  if (!requireNamespace("ComplexHeatmap", quietly = TRUE) ||
+      !requireNamespace("circlize", quietly = TRUE)) {
+    stop("Packages 'ComplexHeatmap' and 'circlize' are required for plot_composition_heatmap().")
+  }
+  cell_fontsize <- max(8, as.numeric(cell_fontsize))
   # Check required columns
   required_cols <- c(cluster_col, celltype_col, value_col, "count")
   missing_cols <- setdiff(required_cols, colnames(composition_df))
@@ -1745,13 +2925,13 @@ plot_composition_heatmap <- function(composition_df,
   colnames(z_matrix) <- colnames(comp_matrix)
   rownames(z_matrix) <- rownames(comp_matrix)
 
-  # Define color function for Z-scores
+  # Define color function for Z-scores (candy blue-white-pink)
   z_range <- stats::quantile(z_matrix, c(0.05, 0.95), na.rm = TRUE)
   max_abs <- max(abs(z_range))
   col_limits <- c(-max_abs, max_abs)
   col_fun <- circlize::colorRamp2(
     c(col_limits[1], 0, col_limits[2]),
-    c("#4575B4", "white", "#D73027")
+    c("#4CC9F0", "#FFF5F8", "#E63980")
   )
 
   # Calculate cluster sizes
@@ -1783,15 +2963,24 @@ plot_composition_heatmap <- function(composition_df,
     cluster_columns = TRUE,
     clustering_distance_rows = "euclidean",
     clustering_method_rows = "ward.D2",
-    row_names_gp = grid::gpar(fontsize = 10),
-    column_names_gp = grid::gpar(fontsize = 10),
-    heatmap_legend_param = list(title_position = "topcenter"),
+    row_names_gp = grid::gpar(fontsize = max(8, 12)),
+    column_names_gp = grid::gpar(fontsize = max(8, 12)),
+    row_title_gp = grid::gpar(fontsize = max(8, 14)),
+    column_title_gp = grid::gpar(fontsize = max(8, 14)),
+    heatmap_legend_param = list(
+      title_position = "topcenter",
+      title_gp = grid::gpar(fontsize = max(8, 12)),
+      labels_gp = grid::gpar(fontsize = max(8, 11))
+    ),
     right_annotation = row_ha,
     row_dend_width = grid::unit(1.5, "cm"),
     column_dend_height = grid::unit(1.5, "cm"),
     cell_fun = function(j, i, x, y, width, height, fill) {
-      grid::grid.text(sprintf("%.2f", comp_matrix[i, j]),
-                      x, y, gp = grid::gpar(fontsize = 8, col = "black"))
+      grid::grid.text(
+        sprintf("%.2f", comp_matrix[i, j]),
+        x, y,
+        gp = grid::gpar(fontsize = cell_fontsize, col = "grey20")
+      )
     }
   )
 
@@ -1815,6 +3004,7 @@ plot_composition_heatmap <- function(composition_df,
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 8)
+#' @param base_size Base font size in points (default: 14; minimum 8)
 #' @return ggplot object and saves plot to file if save_path provided
 #' @examples
 #' \donttest{
@@ -1831,12 +3021,12 @@ plot_composition_barplot <- function(composition_df,
                                      value_col = "proportion",
                                      save_path = NULL,
                                      width = 12,
-                                     height = 8) {
+                                     height = 8,
+                                     base_size = 14) {
 
-  # Generate color palette
-  celltypes <- unique(composition_df[[celltype_col]])
-  palette <- get_color_palette(length(celltypes))
-  names(palette) <- celltypes
+  # Generate stable color palette
+  celltypes <- unique(as.character(composition_df[[celltype_col]]))
+  palette <- assign_celltype_colors(celltypes)
 
   # Order cell types by frequency
   celltype_freq <- composition_df %>%
@@ -1855,7 +3045,7 @@ plot_composition_barplot <- function(composition_df,
                        ggplot2::aes(x = factor(!!rlang::sym(cluster_col)),
                                     y = !!rlang::sym(value_col),
                                     fill = !!rlang::sym(celltype_col))) +
-    ggplot2::geom_bar(stat = "identity", position = "fill", width = 0.8) +
+    ggplot2::geom_bar(stat = "identity", position = "stack", width = 0.8) +
     ggplot2::scale_fill_manual(values = palette) +
     ggplot2::scale_y_continuous(labels = scales::percent_format(),
                                 expand = c(0, 0)) +
@@ -1864,15 +3054,10 @@ plot_composition_barplot <- function(composition_df,
       y = "Cell Type Proportion",
       fill = "Cell Type"
     ) +
-    ggplot2::theme_minimal() +
+    .sphinx_sci_theme(base_size = base_size, grid = FALSE) +
     ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 10),
-      axis.text.y = ggplot2::element_text(size = 10),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
       legend.position = "right",
-      legend.title = ggplot2::element_text(face = "bold"),
-      panel.grid.major.x = ggplot2::element_blank(),
-      panel.grid.minor.y = ggplot2::element_blank(),
       plot.margin = ggplot2::margin(10, 10, 10, 20)
     ) +
     ggplot2::guides(fill = ggplot2::guide_legend(reverse = TRUE))
@@ -1889,8 +3074,16 @@ plot_composition_barplot <- function(composition_df,
 #' Visualize cell-cell interaction matrix
 #'
 #' @param interaction_matrix Interaction matrix from analyze_spatial_interactions()
-#' @param transform Apply log2 transformation (default: TRUE)
-#' @param color_palette Color palette function (default: viridis::inferno)
+#'   (raw counts, enrichment, or abundance-normalized scores)
+#' @param transform Apply log2(x+1) transformation (default: TRUE). Set FALSE
+#'   for enrichment / abundance-normalized matrices.
+#' @param color_palette Color palette function (default: soft sequential)
+#' @param main Heatmap title
+#' @param display_numbers Whether to show numbers in cells (default: FALSE)
+#' @param number_format sprintf format for cell labels (default: auto)
+#' @param cellwidth Cell width in points (default: 14)
+#' @param cellheight Cell height in points (default: 14)
+#' @param fontsize Base font size (default: 12)
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 10)
 #' @param height Plot height in inches (default: 8)
@@ -1898,19 +3091,28 @@ plot_composition_barplot <- function(composition_df,
 #' @examples
 #' \donttest{
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' intx <- analyze_spatial_interactions(df, edges)
 #' visualize_interaction_heatmap(intx$interaction_matrix,
 #'   save_path = tempfile(fileext = ".pdf"))
+#' visualize_interaction_heatmap(intx$enrichment_matrix, transform = FALSE,
+#'   main = "Abundance-normalized contact enrichment")
 #' }
 #' @export
 visualize_interaction_heatmap <- function(interaction_matrix,
                                           transform = TRUE,
-                                          color_palette = viridis::inferno,
+                                          color_palette = NULL,
+                                          main = "Cell-Cell Interaction Frequency",
+                                          display_numbers = FALSE,
+                                          number_format = NULL,
+                                          cellwidth = 14,
+                                          cellheight = 14,
+                                          fontsize = 12,
                                           save_path = NULL,
                                           width = 10,
                                           height = 8) {
 
+  fontsize <- max(8, as.numeric(fontsize))
   mat <- interaction_matrix
 
   # Optional transformation
@@ -1918,21 +3120,40 @@ visualize_interaction_heatmap <- function(interaction_matrix,
     mat <- log2(mat + 1)
   }
 
-  # Create color palette
-  col_fun <- color_palette(256)
+  if (is.null(number_format)) {
+    number_format <- if (isTRUE(transform) || all(mat == floor(mat), na.rm = TRUE)) {
+      "%.0f"
+    } else {
+      "%.2f"
+    }
+  }
 
-  # Create heatmap
+  # Soft sequential palette (avoid high-saturation inferno)
+  if (is.null(color_palette)) {
+    col_fun <- .sphinx_soft_sequential(256)
+  } else if (is.function(color_palette)) {
+    col_fun <- color_palette(256)
+  } else {
+    col_fun <- color_palette
+  }
+
+  # Create heatmap with smaller cells and no cell numbers by default
   hm <- pheatmap::pheatmap(
     mat = mat,
-    main = "Cell-Cell Interaction Frequency",
+    main = main,
     cluster_rows = TRUE,
     cluster_cols = TRUE,
-    fontsize_row = 9,
-    fontsize_col = 9,
-    display_numbers = TRUE,
-    number_format = "%.0f",
+    fontsize = fontsize,
+    fontsize_row = fontsize,
+    fontsize_col = fontsize,
+    display_numbers = display_numbers,
+    number_format = number_format,
+    number_color = "grey20",
+    fontsize_number = max(8, fontsize - 3),
     color = col_fun,
-    border_color = NA,
+    border_color = "white",
+    cellwidth = cellwidth,
+    cellheight = cellheight,
     silent = is.null(save_path)
   )
 
@@ -1950,6 +3171,11 @@ visualize_interaction_heatmap <- function(interaction_matrix,
 
 #' Visualize spatial network with flexible edge selection
 #'
+#' Draws **real pairwise cell-cell edges** using spatial coordinates. Supports
+#' local zoom via `xlim`/`ylim` or `zoom_center` + `zoom_radius`. When zooming,
+#' edges with both endpoints inside the window are kept so local connectivity
+#' is shown faithfully.
+#'
 #' @param df Spatial data
 #' @param edges Spatial network edges
 #' @param celltype_col Cell type column name (default: "celltype")
@@ -1958,13 +3184,19 @@ visualize_interaction_heatmap <- function(interaction_matrix,
 #' @param edge_mode Edge selection mode: "all", "top", or "random" (default: "all")
 #' @param top_n When edge_mode = "top", keep this many strongest edges (default: 1000)
 #' @param max_edges When edge_mode = "random", sample this many edges (default: 1000)
+#' @param xlim Optional x-axis limits for local zoom, e.g. `c(xmin, xmax)`
+#' @param ylim Optional y-axis limits for local zoom, e.g. `c(ymin, ymax)`
+#' @param zoom_center Optional center `c(x, y)` for circular/rectangular zoom
+#' @param zoom_radius Half-width of zoom window around `zoom_center` (same units as coords)
 #' @param point_size Point size (default: 1.5)
-#' @param point_alpha Point transparency (default: 0.7)
+#' @param point_alpha Point transparency (default: 1; keep opaque so cell-type colors stay clear over edges)
 #' @param edge_size_range Edge size range (default: c(0.3, 2.0))
 #' @param edge_alpha_range Edge alpha range (default: c(0.3, 0.9))
-#' @param edge_color Edge color (default: "darkred")
+#' @param edge_color Edge color (default: "grey35")
 #' @param show_points Whether to show points (default: TRUE)
 #' @param legend_point_size Legend point size (default: 3)
+#' @param base_size Base font size (default: 14)
+#' @param title Plot title
 #' @param save_path Output file path (optional)
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
@@ -1972,8 +3204,10 @@ visualize_interaction_heatmap <- function(interaction_matrix,
 #' @examples
 #' \donttest{
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' p <- visualize_spatial_network(df, edges, save_path = tempfile(fileext = ".pdf"))
+#' # Local zoom around tissue center:
+#' # visualize_spatial_network(df, edges, zoom_center = c(500, 500), zoom_radius = 80)
 #' class(p)
 #' }
 #' @export
@@ -1984,13 +3218,19 @@ visualize_spatial_network <- function(df, edges,
                                       edge_mode = c("all", "top", "random"),
                                       top_n = 1000,
                                       max_edges = 1000,
+                                      xlim = NULL,
+                                      ylim = NULL,
+                                      zoom_center = NULL,
+                                      zoom_radius = NULL,
                                       point_size = 1.5,
-                                      point_alpha = 0.7,
+                                      point_alpha = 1,
                                       edge_size_range = c(0.3, 2.0),
-                                      edge_alpha_range = c(0.3, 0.9),
-                                      edge_color = "darkred",
+                                      edge_alpha_range = c(0.15, 0.45),
+                                      edge_color = "grey35",
                                       show_points = TRUE,
                                       legend_point_size = 3,
+                                      base_size = 14,
+                                      title = NULL,
                                       save_path = NULL,
                                       width = 12,
                                       height = 10) {
@@ -2005,13 +3245,40 @@ visualize_spatial_network <- function(df, edges,
     edges <- data.table::as.data.table(edges)
   }
 
+  # Resolve zoom window (local magnification)
+  if (!is.null(zoom_center) && !is.null(zoom_radius)) {
+    if (length(zoom_center) != 2L || !is.finite(zoom_radius) || zoom_radius <= 0) {
+      stop("zoom_center must be c(x, y) and zoom_radius a positive number")
+    }
+    xlim <- c(zoom_center[1] - zoom_radius, zoom_center[1] + zoom_radius)
+    ylim <- c(zoom_center[2] - zoom_radius, zoom_center[2] + zoom_radius)
+  }
+  use_zoom <- !is.null(xlim) && !is.null(ylim)
+  if (xor(is.null(xlim), is.null(ylim))) {
+    stop("Provide both xlim and ylim (or zoom_center + zoom_radius) for local zoom")
+  }
+
   # Prepare coordinates
   edges$from <- as.character(edges$from)
   edges$to <- as.character(edges$to)
   df$Cell_ID <- as.character(df$Cell_ID)
+  # Keep full cell-type color map even after local zoom
+  all_celltype_levels <- unique(as.character(df[[celltype_col]]))
 
   df_coords <- df[, .(Cell_ID, get(x_col), get(y_col))]
   data.table::setnames(df_coords, c("Cell_ID", "X", "Y"))
+
+  # Subset cells to zoom window first so edges reflect true local links
+  if (use_zoom) {
+    keep_ids <- df_coords[X >= xlim[1] & X <= xlim[2] & Y >= ylim[1] & Y <= ylim[2], Cell_ID]
+    df <- df[Cell_ID %in% keep_ids]
+    df_coords <- df_coords[Cell_ID %in% keep_ids]
+    message(
+      "Local zoom: xlim=[", round(xlim[1], 1), ", ", round(xlim[2], 1),
+      "], ylim=[", round(ylim[1], 1), ", ", round(ylim[2], 1),
+      "] | cells=", nrow(df)
+    )
+  }
 
   edges_with_coords <- merge(edges, df_coords, by.x = "from", by.y = "Cell_ID")
   data.table::setnames(edges_with_coords, c("X", "Y"), c("from_x", "from_y"))
@@ -2019,15 +3286,15 @@ visualize_spatial_network <- function(df, edges,
   edges_with_coords <- merge(edges_with_coords, df_coords, by.x = "to", by.y = "Cell_ID")
   data.table::setnames(edges_with_coords, c("X", "Y"), c("to_x", "to_y"))
 
-  # Calculate edge strength
+  # Calculate edge strength from real distances
   if ("dist" %in% names(edges_with_coords)) {
-    edges_with_coords[, strength := 1 / dist]
+    edges_with_coords[, strength := 1 / pmax(dist, .Machine$double.eps)]
   } else {
     edges_with_coords[, dist := sqrt((to_x - from_x)^2 + (to_y - from_y)^2)]
-    edges_with_coords[, strength := 1 / dist]
+    edges_with_coords[, strength := 1 / pmax(dist, .Machine$double.eps)]
   }
 
-  # Filter edges based on mode
+  # Filter edges based on mode (after zoom so local real links are preserved)
   if (edge_mode == "top") {
     if (nrow(edges_with_coords) > top_n) {
       edges_with_coords <- edges_with_coords[order(-strength)][1:top_n]
@@ -2040,61 +3307,100 @@ visualize_spatial_network <- function(df, edges,
       message("Randomly sample ", max_edges, " edges")
     }
   } else {
-    message("Show all ", nrow(edges_with_coords), " edges")
+    message("Show all ", nrow(edges_with_coords), " real cell-cell edges")
   }
 
-  # Create base plot
+  plot_title <- if (!is.null(title)) {
+    title
+  } else if (use_zoom) {
+    "Spatial Network (local zoom)"
+  } else {
+    "Spatial Interaction Network"
+  }
+
+  # Create base plot (no internal grid)
   p <- ggplot2::ggplot() +
-    ggplot2::theme_minimal() +
-    ggplot2::labs(title = "Spatial Interaction Network") +
-    ggplot2::coord_fixed() +
-    ggplot2::theme(
-      panel.background = ggplot2::element_rect(fill = "white", color = "grey90"),
-      panel.grid.major = ggplot2::element_line(color = "grey95", linewidth = 0.2),
-      panel.grid.minor = ggplot2::element_blank(),
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 14)
-    )
-
-  # Add points if requested
-  if (show_points) {
-    cell_types <- unique(df[[celltype_col]])
-    n_types <- length(cell_types)
-    palette <- get_color_palette(n_types)
-    names(palette) <- cell_types
-
-    p <- p + ggplot2::geom_point(
-      data = df,
-      ggplot2::aes_string(x = x_col, y = y_col, color = celltype_col),
-      size = point_size,
-      alpha = point_alpha
+    ggplot2::labs(
+      title = plot_title,
+      x = x_col,
+      y = y_col
     ) +
+    .sphinx_sci_theme(base_size = base_size, grid = FALSE)
+
+  # Draw pairwise cell-cell edges first (under points).
+  # Do NOT map alpha via a scale -- that can wash out opaque cell-type points.
+  if (nrow(edges_with_coords) > 0) {
+    edge_alpha_fixed <- mean(edge_alpha_range)
+    p <- p + ggplot2::geom_segment(
+      data = edges_with_coords,
+      ggplot2::aes(
+        x = .data$from_x, y = .data$from_y,
+        xend = .data$to_x, yend = .data$to_y,
+        linewidth = .data$strength
+      ),
+      color = edge_color,
+      alpha = edge_alpha_fixed,
+      show.legend = FALSE
+    ) +
+      ggplot2::scale_linewidth_continuous(range = edge_size_range, guide = "none")
+  }
+
+  # Overlay cell points on top of edges (fully opaque + white halo so colors stay vivid)
+  if (show_points && nrow(df) > 0) {
+    palette <- assign_celltype_colors(
+      df[[celltype_col]],
+      all_levels = all_celltype_levels
+    )
+    pts <- as.data.frame(df)
+
+    # White underlay keeps cell-type colors from looking washed out on dense edges
+    p <- p +
+      ggplot2::geom_point(
+        data = pts,
+        ggplot2::aes(x = .data[[x_col]], y = .data[[y_col]]),
+        size = point_size * 1.55,
+        color = "white",
+        alpha = 1,
+        shape = 16,
+        show.legend = FALSE
+      ) +
+      ggplot2::geom_point(
+        data = pts,
+        ggplot2::aes(
+          x = .data[[x_col]],
+          y = .data[[y_col]],
+          color = .data[[celltype_col]]
+        ),
+        size = point_size,
+        alpha = point_alpha,
+        shape = 16,
+        stroke = 0
+      ) +
       ggplot2::scale_color_manual(
         name = "Cell Type",
         values = palette,
         guide = ggplot2::guide_legend(
           override.aes = list(
             size = legend_point_size,
-            alpha = 1
+            alpha = 1,
+            shape = 16,
+            linetype = 0,
+            linewidth = 0,
+            stroke = 0
           )
         )
       )
   }
 
-  # Add edges
-  p <- p + ggplot2::geom_segment(
-    data = edges_with_coords,
-    ggplot2::aes(x = from_x, y = from_y,
-                 xend = to_x, yend = to_y,
-                 size = strength, alpha = strength),
-    color = edge_color,
-    show.legend = FALSE
-  ) +
-    ggplot2::scale_size_continuous(range = edge_size_range) +
-    ggplot2::scale_alpha_continuous(range = edge_alpha_range)
+  if (use_zoom) {
+    p <- p + ggplot2::coord_fixed(xlim = xlim, ylim = ylim, expand = FALSE)
+  } else {
+    p <- p + ggplot2::coord_fixed()
+  }
 
   # Save plot if path provided
   if (!is.null(save_path)) {
-    ggplot2::ggsave(save_path, p, width = width, height = height)
+    ggplot2::ggsave(save_path, p, width = width, height = height, dpi = 150)
     message("Spatial network plot saved to: ", save_path)
   }
 
@@ -2113,11 +3419,12 @@ visualize_spatial_network <- function(df, edges,
 #' @param width Plot width in inches (default: 12)
 #' @param height Plot height in inches (default: 10)
 #' @param layout Network layout algorithm (default: "fr")
+#' @param base_size Base font size in points (default: 14; minimum 8)
 #' @return ggraph object and saves plot to file if save_path provided
 #' @examples
 #' \donttest{
 #' df <- prepare_data(Sphinx:::.sphinx_example_df(40))
-#' edges <- build_spatial_network(df, method = "knn", k = 5, verbose = FALSE)
+#' edges <- build_spatial_network(df, method = "knn", n_neighbors = 5, verbose = FALSE)
 #' intx <- analyze_spatial_interactions(df, edges)
 #' p <- visualize_interaction_network(intx$network, save_path = tempfile(fileext = ".pdf"))
 #' class(p)
@@ -2132,7 +3439,12 @@ visualize_interaction_network <- function(network,
                                           save_path = NULL,
                                           width = 12,
                                           height = 10,
-                                          layout = "fr") {
+                                          layout = "fr",
+                                          base_size = 14) {
+
+  base_size <- max(8, as.numeric(base_size))
+  # ggraph/ggplot text size is in mm; enforce >= 8 pt
+  label_size <- max(8 / (72.27 / 25.4), as.numeric(label_size))
 
   # Check if network is valid
   if (igraph::vcount(network) == 0) {
@@ -2152,32 +3464,6 @@ visualize_interaction_network <- function(network,
   igraph::V(network)$degree <- igraph::degree(network)
   igraph::V(network)$strength <- igraph::strength(network)
 
-  # Get cell types
-  cell_types <- unique(igraph::V(network)$name)
-  n_types <- length(cell_types)
-
-  # Create scalable color scheme
-  if (n_types <= 9) {
-    color_scale <- ggplot2::scale_color_brewer(
-      palette = "Set1",
-      name = "Cell Type"
-    )
-  } else if (n_types <= 12) {
-    color_scale <- ggplot2::scale_color_brewer(
-      palette = "Paired",
-      name = "Cell Type"
-    )
-  } else {
-    color_scale <- ggplot2::scale_color_hue(
-      h = c(0, 360) + 15,
-      c = 100,
-      l = 65,
-      h.start = 0,
-      direction = 1,
-      name = "Cell Type"
-    )
-  }
-
   # Simplify large networks
   if (igraph::vcount(network) > max_nodes) {
     node_importance <- igraph::strength(network)
@@ -2186,33 +3472,47 @@ visualize_interaction_network <- function(network,
     message("Network too large, filtered to top ", max_nodes, " important nodes")
   }
 
-  # Create network plot
+  # Soft cell-type colors (stable by name)
+  palette <- assign_celltype_colors(igraph::V(network)$name)
+
+  # Create network plot -- legend keeps cell type dots only
   plot <- ggraph::ggraph(network, layout = layout) +
-    # 1. Edges
     ggraph::geom_edge_link(
       ggplot2::aes(width = weight, alpha = weight),
-      color = "grey50",
-      show.legend = TRUE
+      color = "grey60",
+      show.legend = FALSE
     ) +
     ggraph::scale_edge_width_continuous(
       range = edge_size_range,
-      name = "Interaction\nStrength"
-    ) +
-    ggraph::scale_edge_alpha_continuous(
-      range = c(0.3, 0.8),
       guide = "none"
     ) +
-    # 2. Nodes
+    ggraph::scale_edge_alpha_continuous(
+      range = c(0.25, 0.75),
+      guide = "none"
+    ) +
     ggraph::geom_node_point(
       ggplot2::aes(size = strength, color = name),
-      alpha = 0.85
+      alpha = 0.9,
+      shape = 16
     ) +
     ggplot2::scale_size_continuous(
       range = node_size_range,
-      name = "Interaction\nStrength"
+      guide = "none"
     ) +
-    color_scale +
-    # 3. Labels
+    ggplot2::scale_color_manual(
+      name = "Cell Type",
+      values = palette,
+      guide = ggplot2::guide_legend(
+        override.aes = list(
+          size = 4,
+          shape = 16,
+          alpha = 1,
+          linetype = 0,
+          linewidth = 0,
+          stroke = 0
+        )
+      )
+    ) +
     {
       if (show_labels) {
         ggraph::geom_node_text(
@@ -2225,12 +3525,15 @@ visualize_interaction_network <- function(network,
         )
       }
     } +
-    # 4. Titles and theme
     ggplot2::labs(title = "Spatial Cell Interaction Network") +
-    ggplot2::theme_void() +
+    ggplot2::theme_void(base_size = base_size) +
     ggplot2::theme(
       legend.position = "right",
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
+      legend.title = ggplot2::element_text(face = "plain", size = max(8, base_size)),
+      legend.text = ggplot2::element_text(face = "plain", size = max(8, base_size - 2)),
+      plot.title = ggplot2::element_text(
+        hjust = 0.5, face = "plain", size = max(8, base_size + 4)
+      ),
       panel.background = ggplot2::element_rect(fill = "white", color = NA),
       plot.background = ggplot2::element_rect(fill = "white", color = NA)
     )
@@ -2251,7 +3554,7 @@ visualize_interaction_network <- function(network,
 #' @param y_col Y coordinate column name (default: "Y")
 #' @param coloring Coloring method: "celltype" or "neighborhood" (default: "celltype")
 #' @param highlight_cluster Specific cluster to highlight (optional)
-#' @param celltype_col Cell type column name (default: "annotation")
+#' @param celltype_col Cell type column name (default: "celltype")
 #' @param neighborhood_col Neighborhood cluster column name (default: "Neighborhood_Cluster")
 #' @param background_color Background color for non-highlighted cells (default: "gray90")
 #' @param highlight_alpha Alpha for highlighted cells (default: 0.9)
@@ -2276,7 +3579,7 @@ visualize_voronoi <- function(df,
                               y_col = "Y",
                               coloring = c("celltype", "neighborhood"),
                               highlight_cluster = NULL,
-                              celltype_col = "annotation",
+                              celltype_col = "celltype",
                               neighborhood_col = "Neighborhood_Cluster",
                               background_color = "gray90",
                               highlight_alpha = 0.9,
@@ -2297,12 +3600,15 @@ visualize_voronoi <- function(df,
 
   # Validate parameters
   coloring <- match.arg(coloring)
+  need_nhood <- identical(coloring, "neighborhood") || !is.null(highlight_cluster)
 
   # Check if required columns exist
   if (!x_col %in% names(df)) stop("Column '", x_col, "' not found in data frame")
   if (!y_col %in% names(df)) stop("Column '", y_col, "' not found in data frame")
   if (!celltype_col %in% names(df)) stop("Column '", celltype_col, "' not found in data frame")
-  if (!neighborhood_col %in% names(df)) stop("Column '", neighborhood_col, "' not found in data frame")
+  if (need_nhood && !neighborhood_col %in% names(df)) {
+    stop("Column '", neighborhood_col, "' not found in data frame")
+  }
 
   # Create local column copies
   df <- df %>%
@@ -2310,7 +3616,7 @@ visualize_voronoi <- function(df,
       plot_X = .data[[x_col]],
       plot_Y = .data[[y_col]],
       plot_celltype = as.factor(.data[[celltype_col]]),
-      plot_neighborhood = as.factor(.data[[neighborhood_col]])
+      plot_neighborhood = if (need_nhood) as.factor(.data[[neighborhood_col]]) else NA
     )
 
   # Create Voronoi tessellation
@@ -2334,20 +3640,15 @@ visualize_voronoi <- function(df,
     polygons$color_group <- polygons$celltype
     legend_title <- "Cell Type"
 
-    # Use custom or default palette
     if (is.null(celltype_palette)) {
-      n_celltypes <- length(unique(polygons$color_group))
-      color_palette <- get_color_palette(n_celltypes)
+      color_palette <- assign_celltype_colors(polygons$color_group)
     } else {
       color_palette <- celltype_palette
     }
   } else {
     polygons$color_group <- polygons$neighborhood
     legend_title <- "Neighborhood Cluster"
-
-    # Generate new color scheme for neighborhood types
-    n_clusters <- length(unique(polygons$color_group))
-    color_palette <- scales::hue_pal()(n_clusters)
+    color_palette <- assign_celltype_colors(polygons$color_group)
   }
 
   # Handle highlighting logic
@@ -2356,11 +3657,9 @@ visualize_voronoi <- function(df,
     polygons$highlight <- ifelse(polygons$neighborhood == highlight_cluster,
                                  "Highlighted", "Background")
 
-    # Get cell type color scheme
+    # Get cell type color scheme (stable by name)
     if (is.null(celltype_palette)) {
-      n_celltypes <- length(unique(polygons$celltype))
-      celltype_palette <- get_color_palette(n_celltypes)
-      names(celltype_palette) <- levels(polygons$celltype)
+      celltype_palette <- assign_celltype_colors(polygons$celltype)
     }
 
     # Create highlight color scheme
@@ -2386,12 +3685,7 @@ visualize_voronoi <- function(df,
       ggplot2::theme_void() +
       ggplot2::coord_fixed() +
       ggplot2::labs(
-        title = paste("Voronoi Diagram - Highlighting", highlight_cluster),
-        subtitle = if (show_composition) {
-          paste("Cell composition in", highlight_cluster)
-        } else {
-          NULL
-        }
+        title = paste("Voronoi Diagram - Highlighting", highlight_cluster)
       )
 
     # Add cell type legend (only for highlighted area)
@@ -2418,9 +3712,8 @@ visualize_voronoi <- function(df,
   } else {
     # Standard plot without highlighting
     if (coloring == "celltype") {
-      # Ensure cell type colors match original function
       if (is.null(celltype_palette)) {
-        color_palette <- get_color_palette(length(unique(polygons$color_group)))
+        color_palette <- assign_celltype_colors(polygons$color_group)
       } else {
         color_palette <- celltype_palette
       }
@@ -2431,7 +3724,7 @@ visualize_voronoi <- function(df,
     p <- ggplot2::ggplot(polygons, ggplot2::aes(x = x, y = y, group = cell_id, fill = color_group)) +
       ggplot2::geom_polygon(
         ggplot2::aes(color = border_color),
-        alpha = 0.8, size = 0.2
+        alpha = 0.8, linewidth = 0.2
       ) +
       ggplot2::scale_fill_manual(values = color_palette, name = legend_title) +
       ggplot2::scale_color_identity() +
@@ -2450,7 +3743,12 @@ visualize_voronoi <- function(df,
 
   p <- p +
     ggplot2::xlim(x_range[1] - x_margin, x_range[2] + x_margin) +
-    ggplot2::ylim(y_range[1] - y_margin, y_range[2] + y_margin)
+    ggplot2::ylim(y_range[1] - y_margin, y_range[2] + y_margin) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(hjust = 0.5, face = "plain", size = max(8, 16)),
+      legend.title = ggplot2::element_text(face = "plain", size = max(8, 12)),
+      legend.text = ggplot2::element_text(face = "plain", size = max(8, 11))
+    )
 
   # Save plot if path provided
   if (!is.null(save_path)) {

@@ -2,7 +2,7 @@
 % Please edit documentation in R/spatial_network.R
 \name{calculate_optimal_window_size}
 \alias{calculate_optimal_window_size}
-\title{Calculate optimal window size (Stereopy CCD-style)}
+\title{Calculate an adaptive window size from cell density}
 \usage{
 calculate_optimal_window_size(
   df,
@@ -33,7 +33,8 @@ calculate_optimal_window_size(
 List with window_size, sliding_step, mean_cells, x_range, y_range
 }
 \description{
-Calculate optimal window size (Stereopy CCD-style)
+Iteratively adjusts window side length so that the mean number of cells per
+window falls between \code{min_cells} and \code{max_cells}.
 }
 \examples{
 df <- prepare_data(Sphinx:::.sphinx_example_df(50))

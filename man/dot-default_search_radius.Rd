@@ -2,19 +2,19 @@
 % Please edit documentation in R/spatial_network.R
 \name{.default_search_radius}
 \alias{.default_search_radius}
-\title{Default search radius from mean NN distance}
+\title{Default search radius from local spacing (median 1-NN x multiplier)}
 \usage{
-.default_search_radius(mean_nn_dist, multiplier = 2)
+.default_search_radius(mean_nn_dist, multiplier = 3)
 }
 \arguments{
-\item{mean_nn_dist}{mean k-th nearest-neighbor distance}
+\item{mean_nn_dist}{local spacing distance}
 
-\item{multiplier}{scale factor (default: 2.0)}
+\item{multiplier}{scale factor (default: 3 ~ a few cell spacings)}
 }
 \value{
 numeric search radius
 }
 \description{
-Default search radius from mean NN distance
+Default search radius from local spacing (median 1-NN x multiplier)
 }
 \keyword{internal}

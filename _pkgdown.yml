@@ -93,6 +93,7 @@ reference:
       - visualize_spatial_network
       - visualize_voronoi
       - get_color_palette
+      - assign_celltype_colors
 
   - title: "Functional Analysis"
     contents:
@@ -125,6 +126,12 @@ articles:
       - "functional"
 
 news:
+  - title: "Sphinx v1.0.1"
+    date: "2026-09-09"
+    contents: |
+      Visualization refresh (candy colors, network zoom, capped volcanoes) and
+      documentation updated with the TMA01n t-CyCIF example.
+
   - title: "Sphinx v1.0.0 released"
     date: "2025-09-24"
     contents: |
@@ -132,7 +139,7 @@ news:
 
 development:
   mode: auto
-  version: "1.0.0"
+  version: "1.0.1"
   package: "Sphinx"
 
 authors:

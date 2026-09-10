@@ -2,14 +2,18 @@
 
 #' Custom color palette for visualizations
 #'
-#' A predefined vector of 36 distinct colors for consistent plotting
+#' Distinct candy qualitative colors used for cluster UMAP / spatial views in
+#' preprocessing helpers.
+#'
+#' @format A character vector of hex color codes.
+#' @export
 spatial_colors <- c(
-  "#E5D2DD", "#53A85F", "#F1BB72", "#F3B1A0", "#D6E7A3", "#57C3F3",
-  "#476D87", "#E95C59", "#E59CC4", "#AB3282", "#23452F", "#BD956A",
-  "#8C549C", "#585658", "#9FA3A8", "#E0D4CA", "#5F3D69", "#C5DEBA",
-  "#58A4C3", "#E4C755", "#F7F398", "#AA9A59", "#E63863", "#E39A35",
-  "#C1E6F3", "#6778AE", "#91D0BE", "#B53E2B", "#712820", "#DCC1DD",
-  "#CCE0F5", "#CCC9E6", "#625D9E", "#68A180", "#3A6963", "#968175"
+  "#E05C6E", "#4EA8DE", "#E8C04A", "#4CB87A", "#8B6BC9", "#E8884A",
+  "#3DB8A0", "#C45BA0", "#A67C52", "#5B7FD6", "#A8C75A", "#6B7C85",
+  "#D4A017", "#2E8B57", "#E76F51", "#45A8D0", "#9B59B6", "#1ABC9C",
+  "#3498DB", "#F39C12", "#E74C3C", "#2980B9", "#27AE60", "#8E44AD",
+  "#D35400", "#16A085", "#C0392B", "#2C3E50", "#7F8C8D", "#E67E22",
+  "#1F618D", "#196F3D", "#6C3483", "#922B21", "#B9770E", "#0E6655"
 )
 
 #' Load spatial data from various sources
@@ -315,7 +319,8 @@ process_data <- function(obj,
 
   # Cell clustering workflow
   obj <- Seurat::FindNeighbors(obj, dims = dims)    # Build kNN graph
-  obj <- Seurat::FindClusters(obj, resolution = resolution, algorithm = 4)  # Identify clusters
+  # algorithm = 1 (Louvain) avoids Python/leidenalg dependency required by Leiden (4)
+  obj <- Seurat::FindClusters(obj, resolution = resolution, algorithm = 1)
 
   # Non-linear dimensionality reduction for visualization
   obj <- Seurat::RunUMAP(obj, dims = dims)
@@ -438,10 +443,14 @@ visualize_results <- function(obj, save_dir = "./") {
   }
 
   # Create UMAP cluster visualization
+  cl_lvls <- levels(factor(obj$seurat_clusters))
+  if (!length(cl_lvls)) cl_lvls <- sort(unique(as.character(obj$seurat_clusters)))
+  cl_cols <- assign_celltype_colors(cl_lvls)
+
   p1 <- Seurat::DimPlot(
     obj,
     reduction = "umap",
-    cols = spatial_colors,
+    cols = unname(cl_cols[as.character(cl_lvls)]),
     pt.size = 0.5,
     label = TRUE,
     label.box = TRUE
@@ -452,14 +461,20 @@ visualize_results <- function(obj, save_dir = "./") {
   # Create spatial cluster distribution plot
   p2 <- ggplot2::ggplot(obj@meta.data, ggplot2::aes(x = X, y = Y)) +
     ggplot2::geom_point(ggplot2::aes(color = seurat_clusters), size = 0.5, alpha = 0.8) +
-    ggplot2::theme_classic() +
-    ggplot2::scale_color_manual(values = spatial_colors, name = "Cluster") +
+    ggplot2::theme_classic(base_size = 14) +
+    ggplot2::scale_color_manual(values = cl_cols, name = "Cluster") +
     ggplot2::coord_fixed() +
     ggplot2::labs(x = "X (um)", y = "Y (um)", title = "Spatial Clusters") +
     ggplot2::theme(
-      legend.text = ggplot2::element_text(size = 12, face = "bold"),
-      legend.title = ggplot2::element_text(size = 13)
-    )
+      panel.grid = ggplot2::element_blank(),
+      plot.title = ggplot2::element_text(face = "plain", size = 18, hjust = 0.5),
+      axis.title = ggplot2::element_text(face = "plain", size = 15),
+      axis.text = ggplot2::element_text(face = "plain", size = 13, colour = "black"),
+      legend.text = ggplot2::element_text(size = 12, face = "plain"),
+      legend.title = ggplot2::element_text(size = 13, face = "plain"),
+      panel.border = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8)
+    ) +
+    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 3, shape = 16)))
 
   # Ensure output directory exists
   if (!dir.exists(save_dir)) {

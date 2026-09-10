@@ -1,14 +1,17 @@
 Package: Sphinx
 Type: Package
 Title: Spatial Proteomics and Histology Integrated Analysis
-Version: 1.0.0
-Date: 2026-07-01
+Version: 1.0.1
+Date: 2026-09-10
 Authors@R: 
     person("Mengyi", "Yan", email = "mongi126@163.com", role = c("aut", "cre"))
-Description: A comprehensive toolkit for spatial proteomics data analysis, 
-    including preprocessing, clustering, annotation, spatial network analysis, 
-    and functional enrichment. Supports various spatial platforms and 
-    provides publication-ready visualizations.
+Description: Toolkit for spatial proteomics analysis including preprocessing,
+    clustering, annotation, adaptive spatial neighborhood networks, interaction
+    analysis, differential protein testing, enrichment, and publication-ready
+    visualizations. Supports common spatial platforms (for example CODEX, t-CyCIF,
+    and MIBI-TOF) and provides consistent candy-style qualitative colors with soft
+    sequential heatmaps. Documentation examples use a public CODEX FOV with
+    ClusterName cell-type labels.
 License: MIT + file LICENSE
 URL: https://mongi126.github.io/Sphinx/, https://github.com/mongi126/Sphinx
 BugReports: https://github.com/mongi126/Sphinx/issues
@@ -21,6 +24,7 @@ Imports:
     data.table (>= 1.14.8),
     RANN (>= 2.6.1),
     deldir (>= 1.0.9),
+    geometry (>= 0.4.5),
     igraph (>= 1.5.0),
     Matrix (>= 1.6.0),
     rlang (>= 1.1.0),
@@ -39,12 +43,15 @@ Imports:
     progress (>= 1.2.2),
     patchwork (>= 1.3.0),
     purrr,
+    parallel,
     dbscan,
+    BiocNeighbors,
     reshape2,
     utils,
     methods,
     RColorBrewer,
-    stats
+    stats,
+    grid
 Suggests:
     knitr,
     irlba (>= 2.3.5),
@@ -54,9 +61,10 @@ Suggests:
     org.Hs.eg.db (>= 3.17.0),
     rmarkdown,
     grDevices,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    rhdf5
 Encoding: UTF-8
-LazyData: true
+LazyData: false
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
