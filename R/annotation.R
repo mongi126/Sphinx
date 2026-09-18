@@ -637,7 +637,7 @@ plot_umap_markers <- function(seurat_obj,
   if (length(markers) == 0) stop("No valid markers found for visualization.")
 
   # ---- Ensure marker expression is numeric ----
-  expr_mat <- GetAssayData(seurat_obj, assay = assay, slot = "data")
+  expr_mat <- GetAssayData(seurat_obj, assay = assay, layer = "data")
   expr_mat <- as.matrix(expr_mat)
   storage.mode(expr_mat) <- "numeric"
 

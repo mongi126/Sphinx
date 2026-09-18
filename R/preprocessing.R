@@ -277,7 +277,7 @@ process_data <- function(obj,
     message("Using manual CLR normalization instead...")
 
     # Manual CLR normalization implementation
-    counts_data <- Seurat::GetAssayData(obj, assay = assay_name, slot = "counts")
+    counts_data <- Seurat::GetAssayData(obj, assay = assay_name, layer = "counts")
 
     # CLR normalization: log(1 + x / (exp(mean(log(1 + x)))))
     clr_normalize <- function(x) {
@@ -302,7 +302,7 @@ process_data <- function(obj,
     obj <- Seurat::SetAssayData(
       obj,
       assay = assay_name,
-      slot = "data",
+      layer = "data",
       new.data = as(clr_data, "dgCMatrix")
     )
     message("Manual CLR normalization completed")

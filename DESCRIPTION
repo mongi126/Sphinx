@@ -18,7 +18,7 @@ BugReports: https://github.com/mongi126/Sphinx/issues
 Depends: 
     R (>= 4.3.0)
 Imports:
-    Seurat (>= 4.3.0),
+    Seurat (>= 5.0.0),
     dplyr (>= 1.1.0),
     ggplot2 (>= 3.4.0),
     data.table (>= 1.14.8),
