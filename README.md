@@ -3,11 +3,10 @@
 [![R-CMD-check](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub last commit](https://img.shields.io/github/last-commit/mongi126/Sphinx)](https://github.com/mongi126/Sphinx/commits/main)
-[![Release](https://img.shields.io/github/v/release/mongi126/Sphinx?include_prereleases&sort=semver)](https://github.com/mongi126/Sphinx/releases)
 [![R version](https://img.shields.io/badge/R-%3E%3D4.3-blue)](https://www.r-project.org/)
 [![Docs](https://img.shields.io/badge/docs-pkgdown-lightgrey)](https://mongi126.github.io/Sphinx/)
 
-Sphinx is an R toolkit for **spatial proteomics**: preprocessing, annotation, spatial neighborhood graphs, and functional enrichment—with publication-ready plots.
+Sphinx is an R toolkit for spatial proteomics analysis, covering preprocessing, annotation, spatial neighborhood graphs, and functional enrichment.
 
 <p align="center">
   <img src="man/figures/workflow.png" alt="Sphinx workflow" width="100%"/>
