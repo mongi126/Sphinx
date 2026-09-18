@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = "#>", fig.align = "center", out.wid
 
 This module prepares spatial proteomics inputs (CODEX / CyCIF / MIBI tables or Seurat objects): QC filtering, normalization, dimensionality reduction, and clustering.
 
-Examples use **reg055_A** (CODEX CRC, Schurch *et al.* 2020).
+Examples use **reg055_A** (CODEX CRC, Schurch *et al.* 2020). Download from [SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60) → **reg055_A**.
 
 ## Load packages
 

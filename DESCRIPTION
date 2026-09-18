@@ -10,8 +10,8 @@ Description: Toolkit for spatial proteomics analysis including preprocessing,
     analysis, differential protein testing, enrichment, and publication-ready
     visualizations. Supports common spatial platforms (for example CODEX, t-CyCIF,
     and MIBI-TOF) and provides consistent candy-style qualitative colors with soft
-    sequential heatmaps. Documentation examples use a public CODEX FOV with
-    ClusterName cell-type labels.
+    sequential heatmaps. Documentation examples use public CODEX FOV
+    reg055_A (SpatialOmics dataset 60) with ClusterName cell-type labels.
 License: MIT + file LICENSE
 URL: https://mongi126.github.io/Sphinx/, https://github.com/mongi126/Sphinx
 BugReports: https://github.com/mongi126/Sphinx/issues

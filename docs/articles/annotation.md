@@ -5,7 +5,9 @@
 This module finds cluster markers, visualizes protein panels, and
 assigns readable cell-type labels. The worked example starts from
 clustered **reg055\_A** data and maps Seurat clusters to biological
-names.
+names. Download the FOV from
+[SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+→ **reg055\_A**.
 
 ## Load packages and object
 

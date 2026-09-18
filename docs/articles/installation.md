@@ -34,6 +34,9 @@ help(package = "Sphinx")
 Tutorials use **reg055\_A** from Schurch *et al.* CODEX imaging
 (`schurch2020coordinated`):
 
+  - **Download:**
+    [SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+    → select **reg055\_A**
   - Technology: CODEX
   - \~3,887 cells, 58 protein channels
   - Coordinates in `obsm/spatial`

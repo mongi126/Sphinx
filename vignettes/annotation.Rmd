@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = "#>", fig.align = "center", out.wid
 
 ## Overview
 
-This module finds cluster markers, visualizes protein panels, and assigns readable cell-type labels. The worked example starts from clustered **reg055_A** data and maps Seurat clusters to biological names.
+This module finds cluster markers, visualizes protein panels, and assigns readable cell-type labels. The worked example starts from clustered **reg055_A** data and maps Seurat clusters to biological names. Download the FOV from [SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60) → **reg055_A**.
 
 ## Load packages and object
 

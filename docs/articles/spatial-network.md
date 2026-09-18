@@ -7,7 +7,9 @@ features and clusters, and visualizes distances, composition, purity,
 and cell-cell interactions.
 
 **Demo:** reg055\_A (CODEX CRC, Schurch *et al.* 2020) with annotated
-cell-type labels from the annotation tutorial.
+cell-type labels from the annotation tutorial. Download from
+[SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+→ **reg055\_A**.
 
 ## Load packages and prepare data
 

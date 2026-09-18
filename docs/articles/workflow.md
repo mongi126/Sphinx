@@ -12,10 +12,14 @@ together or independently:
   - Differential proteins, enrichment, and publication-ready figures
 
 Tutorials use **reg055\_A** from the public CODEX colorectal carcinoma
-cohort of Schurch *et al.*, *Cell* (2020)
-([data](https://data.mendeley.com/datasets/mpjzbtfgfr/1)): \~3.9k cells
-and 58 proteins, with published `ClusterName` labels that we map onto
-reclustered identities for the worked examples.
+cohort of Schurch *et al.*, *Cell* (2020): \~3.9k cells and 58 proteins,
+with published `ClusterName` labels that we map onto reclustered
+identities for the worked examples.
+
+**Download:**
+[SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+→ select **reg055\_A** (original cohort also on
+[Mendeley](https://data.mendeley.com/datasets/mpjzbtfgfr/1)).
 
 ![](workflow.png)
 

@@ -7,6 +7,9 @@ tables or Seurat objects): QC filtering, normalization, dimensionality
 reduction, and clustering.
 
 Examples use **reg055\_A** (CODEX CRC, Schurch *et al.* 2020).
+Download from
+[SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+→ **reg055\_A**.
 
 ## Load packages
 

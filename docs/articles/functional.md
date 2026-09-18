@@ -7,7 +7,9 @@ differential testing (spatial-block aware by default), volcano plots
 with a capped y-axis, and enrichment summaries.
 
 **Demo:** reg055\_A panel expression with neighborhood clusters from the
-spatial-network tutorial.
+spatial-network tutorial. Download from
+[SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60)
+→ **reg055\_A**.
 
 ## Prepare protein table
 

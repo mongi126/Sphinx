@@ -1,8 +1,21 @@
 # Sphinx
 
+[![R-CMD-check](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mongi126/Sphinx/actions/workflows/R-CMD-check.yaml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub last commit](https://img.shields.io/github/last-commit/mongi126/Sphinx)](https://github.com/mongi126/Sphinx/commits/main)
+[![Release](https://img.shields.io/github/v/release/mongi126/Sphinx?include_prereleases&sort=semver)](https://github.com/mongi126/Sphinx/releases)
+[![R version](https://img.shields.io/badge/R-%3E%3D4.3-blue)](https://www.r-project.org/)
+[![Docs](https://img.shields.io/badge/docs-pkgdown-lightgrey)](https://mongi126.github.io/Sphinx/)
+
 Sphinx is an R toolkit for **spatial proteomics**: preprocessing, annotation, spatial neighborhood graphs, and functional enrichment—with publication-ready plots.
 
+<p align="center">
+  <img src="man/figures/workflow.png" alt="Sphinx workflow" width="100%"/>
+</p>
+
 Documentation demos use **reg055_A** from Schurch *et al.* CODEX CRC (*Cell* 2020): ~3.9k cells with annotated cell-type labels.
+
+**Example data download:** [SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60) → select **reg055_A**.
 
 ## Installation
 
@@ -30,3 +43,7 @@ visualize_spatial_network(clus, edges, edge_mode = "top", top_n = 1500, point_al
 - Website: https://mongi126.github.io/Sphinx/
 - Vignettes: `vignette("workflow", package = "Sphinx")`
 - Issues: https://github.com/mongi126/Sphinx/issues
+
+## License
+
+MIT © Mengyi Yan
