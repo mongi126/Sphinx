@@ -18,3 +18,4 @@
 ^\.Rhistory$
 ^debug.*$
 ^verify_.*\.R$
+^figure$
