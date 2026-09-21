@@ -38,10 +38,22 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      # pak cannot extract R 4.6 macOS binaries (zstd .tgz). Use install.packages there.
       - uses: r-lib/actions/setup-r-dependencies@v2
+        if: runner.os != 'macOS'
         with:
           extra-packages: any::rcmdcheck
           needs: check
+
+      - name: Install R dependencies (macOS)
+        if: runner.os == 'macOS'
+        shell: Rscript {0}
+        run: |
+          install.packages("BiocManager")
+          options(repos = BiocManager::repositories())
+          install.packages("remotes")
+          remotes::install_deps(dependencies = TRUE, upgrade = "never")
+          install.packages("rcmdcheck")
 
       - uses: r-lib/actions/check-r-package@v2
         with:
