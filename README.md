@@ -43,7 +43,7 @@ visualize_spatial_network(clus, edges, edge_mode = "top", top_n = 1500, point_al
 - Vignettes: `vignette("workflow", package = "Sphinx")`
 - Issues: https://github.com/mongi126/Sphinx/issues
 
-## Citation:
+## Citation
 
 - Yan M, Tan X, Liu Z, Zhang S, Du Y, Li H, Chen L, Xie L. (2026). Sphinx: An R package for adaptive spatial neighborhood modeling and functional analysis in spatial omics. PLoS Computational Biology, 22(11): e1014954. https://doi.org/10.1371/journal.pcbi.1014954.
 
