@@ -12,9 +12,9 @@ Sphinx is an R toolkit for spatial proteomics analysis, covering preprocessing, 
   <img src="man/figures/workflow.png" alt="Sphinx workflow" width="100%"/>
 </p>
 
-Documentation demos use **reg055_A** from Schurch *et al.* CODEX CRC (*Cell* 2020): ~3.9k cells with annotated cell-type labels.
+Documentation demos use **reg055_A** from Schurch *et al.* CODEX CRC (*Cell* 2020).
 
-**Example data download:** [](https://data.mendeley.com/datasets/mpjzbtfgfr/1) 
+Example data download: [Mendeley Data](https://data.mendeley.com/datasets/mpjzbtfgfr/1).
 
 ## Installation
 
