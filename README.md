@@ -14,7 +14,7 @@ Sphinx is an R toolkit for spatial proteomics analysis, covering preprocessing, 
 
 Documentation demos use **reg055_A** from Schurch *et al.* CODEX CRC (*Cell* 2020): ~3.9k cells with annotated cell-type labels.
 
-**Example data download:** [SpatialOmics dataset 60](https://gene.ai.tencent.com/SpatialOmics/dataset?datasetID=60) → select **reg055_A**.
+**Example data download:** [](https://data.mendeley.com/datasets/mpjzbtfgfr/1) 
 
 ## Installation
 
@@ -42,6 +42,10 @@ visualize_spatial_network(clus, edges, edge_mode = "top", top_n = 1500, point_al
 - Website: https://mongi126.github.io/Sphinx/
 - Vignettes: `vignette("workflow", package = "Sphinx")`
 - Issues: https://github.com/mongi126/Sphinx/issues
+
+## Citation:
+
+- Yan M, Tan X, Liu Z, Zhang S, Du Y, Li H, Chen L, Xie L. (2026). Sphinx: An R package for adaptive spatial neighborhood modeling and functional analysis in spatial omics. PLoS Computational Biology, 22(11): e1014954. https://doi.org/10.1371/journal.pcbi.1014954.
 
 ## License
 
